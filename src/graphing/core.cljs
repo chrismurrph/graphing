@@ -46,7 +46,8 @@
   (let [bounds (. (reagent/dom-node component) getBoundingClientRect)
         y (- (.-clientY e) (.-top bounds))
         x (- (.-clientX e) (.-left bounds))]
-     (put! comms {:type (.-type e) :x x :y y})))
+     (put! comms {:type (.-type e) :x x :y y})
+     nil))
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
   (let [{:keys [paths current-path]} @state-ref
