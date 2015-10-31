@@ -65,7 +65,7 @@
         ch (chan)
         proc (controller ch paths-ratom)]
     (reagent/render-component
-       [trending-app {:key (gen-key) :state-ref paths-ratom :comms ch}]
+       [trending-app {:state-ref paths-ratom :comms ch}]
        (.-body js/document))
     (go
       (let [exit (<! proc)]
