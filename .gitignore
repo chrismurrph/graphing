@@ -1,5 +1,11 @@
+target
 pom.xml
 pom.xml.asc
+out
+figwheel_server.log
+/*.iml
+.idea
+.lein-failures
 *jar
 /lib/
 /classes/
@@ -10,3 +16,5 @@ pom.xml.asc
 .lein-plugins/
 .lein-failures
 .nrepl-port
+/graphing.tws
+/resources/public/js/
