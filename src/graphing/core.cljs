@@ -36,18 +36,11 @@
 
            [s e] (recur cur-x cur-y mouse-state))))
     
-(defn old-path-component [its-path fill-color]
+(defn path-component [its-path fill-color]
    (let [xys (map (fn [{:keys [x y]}] (str x " " y)) its-path)
          points (apply str (interpose ", " xys))
          _ (u/log points)]
      [:polyline {:key (gen-key) :points points :stroke fill-color :fill "none"}]))    
-   
-(defn new-path-component [its-path fill-color]
-  (into [:polyline]
-        (for [xys (map (fn [{:keys [x y]}] (str x " " y)) its-path)
-              points (apply str (interpose ", " xys))
-              idx (gen-key)]
-          {:key idx :points points :stroke fill-color :fill "none"})))   
 
 (defn event-handler-fn [comms component e]
   (let [bounds (. (reagent/dom-node component) getBoundingClientRect)
@@ -64,8 +57,8 @@
            :height 480 :width 640 
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
-     (cons [new-path-component current-path "red"]
-      (map #(vector new-path-component % "black") paths))]))
+     (cons [path-component current-path "red"]
+      (map #(vector path-component % "black") paths))]))
       
 (defn mount-root []
   (let [paths-ratom (ratom {:paths []})
