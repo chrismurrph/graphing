@@ -89,7 +89,7 @@
   [point x y])
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
-  (let [{:keys [paths my-points]} @state-ref
+  (let [{:keys [my-points]} @state-ref
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
@@ -98,12 +98,11 @@
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
      (cons [:g]
-           ;(map #(vector path-component % "black") paths)
            (map #(vector point-component % "black") my-points)
            )]))
 
 (defn mount-root []
-  (let [paths-ratom (ratom {:paths [] :my-points []})
+  (let [paths-ratom (ratom {:my-points []})
         ch (chan)
         proc (controller ch paths-ratom)]
     (reagent/render-component
