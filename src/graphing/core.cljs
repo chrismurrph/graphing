@@ -16,7 +16,8 @@
     ;(u/log res)
     res))
 
-(def first-line )
+(def first-line [[10 10] [20 20] [30 30] [40 40] [50 50]])
+(def current-line 1)
 
 (def point-defaults
   {:stroke "black"
@@ -64,7 +65,7 @@
 
                   [({:type "mouseup" :x x :y y} :as e) :up]
                   (do
-                    (swap! state-ref update-in [:my-lines 0] (fn [coll-at-n] (conj coll-at-n [x y])))
+                    (swap! state-ref update-in [:my-lines current-line] (fn [coll-at-n] (vec (conj coll-at-n [x y]))))
                     (u/log @state-ref)
                     (recur x y :up))
 
@@ -98,11 +99,10 @@
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
      (into [:g {:key (gen-key)}]
-           (map #(point-component %) (mapcat identity my-lines))
-           )]))
+           (map #(point-component %) (mapcat identity my-lines)))]))
 
 (defn mount-root []
-  (let [paths-ratom (ratom {:my-lines []})
+  (let [paths-ratom (ratom {:my-lines [first-line]})
         ch (chan)
         proc (controller ch paths-ratom)]
     (reagent/render-component
