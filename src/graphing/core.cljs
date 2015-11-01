@@ -62,9 +62,10 @@
 
                   [({:type "mouseup" :x x :y y} :as e) :up]
                   (do
-                    (swap! state-ref (fn [{:keys [paths my-points] :as state}]
-                                       (assoc state :my-points (conj my-points [x y]))))
-                    (u/log (:my-points @state-ref))
+                    ;(swap! state-ref (fn [{:keys [my-points] :as state}]
+                    ;                   (assoc state :my-points (conj my-points [x y]))))
+                    (swap! state-ref update-in [:my-lines 0] (fn [coll-at-n] (conj coll-at-n [x y])))
+                    (u/log (:my-lines @state-ref))
                     (recur x y :up))
 
                   [s e] (recur cur-x cur-y mouse-state))))
@@ -86,10 +87,10 @@
      nil))
 
 (defn point-component [[x y]]
-  [point x y])
+  ^{:key (gen-key)} [point x y])
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
-  (let [{:keys [my-points]} @state-ref
+  (let [{:keys [my-lines]} @state-ref
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
@@ -97,12 +98,12 @@
            :height 480 :width 640 
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
-     (cons [:g]
-           (map #(vector point-component % "black") my-points)
+     (cons [:g {:key (gen-key)}]
+           (map #(point-component %) (mapcat identity my-lines))
            )]))
 
 (defn mount-root []
-  (let [paths-ratom (ratom {:my-points []})
+  (let [paths-ratom (ratom {:my-lines []})
         ch (chan)
         proc (controller ch paths-ratom)]
     (reagent/render-component
