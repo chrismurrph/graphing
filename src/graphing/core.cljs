@@ -69,20 +69,14 @@
 
                   [s e] (recur cur-x cur-y mouse-state))))
 
-(defn old-path-component [its-path fill-color]
+(def controller new-controller)
+
+(defn path-component [its-path fill-color]
    (let [xys (map (fn [{:keys [x y]}] (str x " " y)) its-path)
          points (apply str (interpose ", " xys))
-         idx (gen-key)
-         _ (u/log idx " " (count points))
+         ;_ (u/log points)
          ]
-     [:polyline {:key idx :points points :stroke fill-color :fill "none"}]))
-
-(defn new-path-component [its-path fill-color]
-  (into [:polyline]
-        (for [xys (map (fn [{:keys [x y]}] (str x " " y)) its-path)
-              points (apply str (interpose ", " xys))
-              idx (gen-key)]
-          {:key idx :points points :stroke fill-color :fill "none"})))
+     ^{:key (gen-key)} [:polyline {:points points :stroke fill-color :fill "none"}]))
 
 (defn event-handler-fn [comms component e]
   (let [bounds (. (reagent/dom-node component) getBoundingClientRect)
@@ -91,26 +85,27 @@
      (put! comms {:type (.-type e) :x x :y y})
      nil))
 
-(defn my-points-component []
-  [:g
-   [point 10 10]
-   [point 20 20]])
+(defn point-component [[x y]]
+  [point x y])
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
   (let [{:keys [paths my-points current-path]} @state-ref
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
-    [:svg {:height 480 :width 640 :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn :style {:border "thin solid black"}}
-     (cons [new-path-component current-path "red"]
-      (map #(vector new-path-component % "black") paths))
-      ;[my-points-component]
-      ]))
-      
+    [:svg {:key (gen-key)
+           :height 480 :width 640 
+           :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
+           :style {:border "thin solid black"}}
+     (cons [path-component current-path "red"]
+           ;(map #(vector path-component % "black") paths)
+           (map #(vector point-component % "black") my-points)
+           )]))
+
 (defn mount-root []
   (let [paths-ratom (ratom {:paths [] :my-points []})
         ch (chan)
-        proc (old-controller ch paths-ratom)]
+        proc (controller ch paths-ratom)]
     (reagent/render-component
        [trending-app {:state-ref paths-ratom :comms ch}]
        (.-body js/document))
