@@ -16,6 +16,8 @@
     ;(u/log res)
     res))
 
+(def first-line )
+
 (def point-defaults
   {:stroke "black"
    :stroke-width 2
@@ -62,10 +64,8 @@
 
                   [({:type "mouseup" :x x :y y} :as e) :up]
                   (do
-                    ;(swap! state-ref (fn [{:keys [my-points] :as state}]
-                    ;                   (assoc state :my-points (conj my-points [x y]))))
                     (swap! state-ref update-in [:my-lines 0] (fn [coll-at-n] (conj coll-at-n [x y])))
-                    (u/log (:my-lines @state-ref))
+                    (u/log @state-ref)
                     (recur x y :up))
 
                   [s e] (recur cur-x cur-y mouse-state))))
@@ -94,11 +94,10 @@
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
-    [:svg {:key (gen-key)
-           :height 480 :width 640 
+    [:svg {:height 480 :width 640
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
-     (cons [:g {:key (gen-key)}]
+     (into [:g {:key (gen-key)}]
            (map #(point-component %) (mapcat identity my-lines))
            )]))
 
