@@ -62,7 +62,7 @@
 
                   [({:type "mouseup" :x x :y y} :as e) :up]
                   (do
-                    (swap! state-ref (fn [{:keys [current-path paths my-points] :as state}]
+                    (swap! state-ref (fn [{:keys [paths my-points] :as state}]
                                        (assoc state :my-points (conj my-points [x y]))))
                     (u/log (:my-points @state-ref))
                     (recur x y :up))
@@ -89,7 +89,7 @@
   [point x y])
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
-  (let [{:keys [paths my-points current-path]} @state-ref
+  (let [{:keys [paths my-points]} @state-ref
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
@@ -97,7 +97,7 @@
            :height 480 :width 640 
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
-     (cons [path-component current-path "red"]
+     (cons [:g]
            ;(map #(vector path-component % "black") paths)
            (map #(vector point-component % "black") my-points)
            )]))
