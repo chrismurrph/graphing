@@ -1,7 +1,6 @@
 # graphing
 Graphing values over time (trending)
 
-Currently just something copied from here:
-https://gist.github.com/cstorey/9198985
+Can be used as the beginning of any trending (values over time) graph. 
 
-, which is a simple paint program.
+`lein figwheel` and view at http://localhost:3449/
