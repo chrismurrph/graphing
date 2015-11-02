@@ -19,12 +19,24 @@
 (def first-line [[10 10] [20 20] [30 30] [40 40] [50 50]])
 (def current-line 1)
 (def height 480)
-(defn now [] (js/Date.))
+(defn now-time [] (js/Date.))
 (defn seconds [js-date] (.getSeconds js-date))
 
 (defn still-interested? [past-time current-time]
   (let [diff (- (seconds current-time) (seconds past-time))]
     (< diff 10)))
+
+;;
+;; When in sticky time we want mouse movement to be ignored.
+;; Thus if user drags to a place and leaves it there for a second, he can then move the cursor out of the way
+;; A further refinement would be for the moving away to make it 'stuck'
+;; (and clicking would also have to have this effect)
+;;
+(defn in-sticky-time? [past-time current-time]
+  (if (or (nil? current-time) (nil? past-time))
+    false
+    (let [diff (- (seconds current-time) (seconds past-time))]
+      (< 1 diff 4))))
 
 (def point-defaults
   {:stroke "black"
@@ -43,7 +55,8 @@
                            (merge segment-defaults
                                   {:x1 (first from) :y1 (second from)
                                    :x2 (first to) :y2 (second to)})])
-        _ (when res (u/log res))]
+        ;_ (when res (u/log res))
+        ]
     res))
 
 ;;
@@ -85,11 +98,14 @@
            (match [(<! inchan)]
 
                   [{:type "mousemove" :x x :y y}]
-                  (do
+                  (let [now-moment (now-time)
+                        previous-mouse-moment (:last-mouse-moment @state-ref)]
                     ;(u/log "Moved to " x)
-                    (swap! state-ref assoc-in [:hover-pos] x)
-                    (swap! state-ref assoc-in [:last-mouse-moment] (now))
-                    ;(u/log (get-in @state-ref [:hover-pos]))
+                    (when (not (in-sticky-time? previous-mouse-moment now-moment))
+                      (swap! state-ref assoc-in [:hover-pos] x)
+                      (swap! state-ref assoc-in [:last-mouse-moment] now-moment)
+                      ;(u/log (get-in @state-ref [:hover-pos]))
+                      )
                     (recur x y))
 
                   [{:type "mouseup" :x x :y y}]
@@ -121,22 +137,22 @@
 
 (def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil}))
 
-(defn hover-visible? [last-mouse-moment]
+(defn hover-visible? [last-mouse-moment now-moment]
   (if (nil? last-mouse-moment)
     false
-    (still-interested? last-mouse-moment (now))))
+    (still-interested? last-mouse-moment now-moment)))
 
 (defn tick []
   ;(u/log "TICK")
-  (let [now (now)
-        should-be-visible (hover-visible? (:last-mouse-moment @state))]
+  (let [now (now-time)
+        should-be-visible (hover-visible? (:last-mouse-moment @state) now)]
     ;(u/log should-be-visible " at " now)
     (when (not should-be-visible)
       (swap! state assoc-in [:hover-pos] nil)
       (swap! state assoc-in [:last-mouse-moment] nil)))
   )
 
-(defonce time-updater (js/setInterval #(tick) 1000))
+(defonce time-updater (js/setInterval #(tick) 100))
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
   (let [{:keys [my-lines hover-pos last-mouse-moment]} @state-ref
@@ -147,7 +163,7 @@
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
      [all-points-component my-lines]
-     [hover-line-at (hover-visible? last-mouse-moment) hover-pos]]))
+     [hover-line-at (not (nil? hover-pos)) hover-pos]]))
 
 (defn mount-root []
   (let [paths-ratom state
