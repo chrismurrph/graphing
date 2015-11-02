@@ -18,12 +18,29 @@
 
 (def first-line [[10 10] [20 20] [30 30] [40 40] [50 50]])
 (def current-line 1)
+(def height 480)
 
 (def point-defaults
   {:stroke "black"
    :stroke-width 2
    :fill "blue"
    :r 5})
+
+(def segment-defaults
+  {:stroke "black"
+   :stroke-width 2})
+
+(defn segment [height x]
+  (let [from [x 0]
+        to [x height]
+        res [:line
+             (merge segment-defaults
+                    {:x1 (first from) :y1 (second from)
+                     :x2 (first to) :y2 (second to)})]
+        _ (u/log res)]
+    res))
+
+(def hover-line-at (partial segment height))
 
 ;;
 ;; Creates a point as a component
@@ -60,13 +77,14 @@
 
                   [({:type "mousemove" :x x :y y} :as e) :up]
                   (do
-                    ;(u/log "Moved to " x " " y)
+                    ;(u/log "Moved to " x)
+                    (swap! state-ref assoc-in [:hover-pos] x)
+                    ;(u/log (get-in @state-ref [:hover-pos]))
                     (recur x y :up))
 
                   [({:type "mouseup" :x x :y y} :as e) :up]
                   (do
                     (swap! state-ref update-in [:my-lines current-line] (fn [coll-at-n] (vec (conj coll-at-n [x y]))))
-                    (u/log @state-ref)
                     (recur x y :up))
 
                   [s e] (recur cur-x cur-y mouse-state))))
@@ -90,19 +108,25 @@
 (defn point-component [[x y]]
   ^{:key (gen-key)} [point x y])
 
+(defn all-points-component [my-lines]
+  (into [:g {:key (gen-key)}]
+        (map #(point-component %) (mapcat identity my-lines))
+        ))
+
 (defn trending-app [{:keys [state-ref comms] :as props}]
-  (let [{:keys [my-lines]} @state-ref
+  (let [{:keys [my-lines hover-pos]} @state-ref
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
-    [:svg {:height 480 :width 640
+    [:svg {:height height :width 640
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
-     (into [:g {:key (gen-key)}]
-           (map #(point-component %) (mapcat identity my-lines)))]))
+     [all-points-component my-lines]
+     [hover-line-at hover-pos]
+     ]))
 
 (defn mount-root []
-  (let [paths-ratom (ratom {:my-lines [first-line]})
+  (let [paths-ratom (ratom {:my-lines [first-line] :hover-pos nil})
         ch (chan)
         proc (controller ch paths-ratom)]
     (reagent/render-component
