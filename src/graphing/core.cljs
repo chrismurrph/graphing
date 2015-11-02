@@ -19,6 +19,12 @@
 (def first-line [[10 10] [20 20] [30 30] [40 40] [50 50]])
 (def current-line 1)
 (def height 480)
+(defn now [] (js/Date.))
+(defn seconds [js-date] (.getSeconds js-date))
+
+(defn still-interested? [past-time current-time]
+  (let [diff (- (seconds current-time) (seconds past-time))]
+    (< diff 10)))
 
 (def point-defaults
   {:stroke "black"
@@ -30,16 +36,19 @@
   {:stroke "black"
    :stroke-width 2})
 
-(defn segment [height x]
-  (let [from [x 0]
-        to [x height]
-        res [:line
-             (merge segment-defaults
-                    {:x1 (first from) :y1 (second from)
-                     :x2 (first to) :y2 (second to)})]
-        _ (u/log res)]
+(defn segment [height visible x-position]
+  (let [from [x-position 0]
+        to [x-position height]
+        res (when visible [:line
+                           (merge segment-defaults
+                                  {:x1 (first from) :y1 (second from)
+                                   :x2 (first to) :y2 (second to)})])
+        _ (when res (u/log res))]
     res))
 
+;;
+;; Need to supply visible and x-position to display it
+;;
 (def hover-line-at (partial segment height))
 
 ;;
@@ -72,31 +81,29 @@
            [s e] (recur cur-x cur-y mouse-state))))
 
 (defn new-controller [inchan state-ref]
-  (go-loop [cur-x nil cur-y nil mouse-state :up]
-           (match [(<! inchan) mouse-state]
+  (go-loop [cur-x nil cur-y nil]
+           (match [(<! inchan)]
 
-                  [({:type "mousemove" :x x :y y} :as e) :up]
+                  [{:type "mousemove" :x x :y y}]
                   (do
                     ;(u/log "Moved to " x)
                     (swap! state-ref assoc-in [:hover-pos] x)
+                    (swap! state-ref assoc-in [:last-mouse-moment] (now))
                     ;(u/log (get-in @state-ref [:hover-pos]))
-                    (recur x y :up))
+                    (recur x y))
 
-                  [({:type "mouseup" :x x :y y} :as e) :up]
+                  [{:type "mouseup" :x x :y y}]
                   (do
                     (swap! state-ref update-in [:my-lines current-line] (fn [coll-at-n] (vec (conj coll-at-n [x y]))))
-                    (recur x y :up))
+                    ;(u/log "When mouse up time is: " when-last-moved)
+                    (recur x y))
 
-                  [s e] (recur cur-x cur-y mouse-state))))
+                  [_]
+                  (do
+                    (u/log "Is constant or what?")
+                    (recur cur-x cur-y)))))
 
 (def controller new-controller)
-
-(defn path-component [its-path fill-color]
-   (let [xys (map (fn [{:keys [x y]}] (str x " " y)) its-path)
-         points (apply str (interpose ", " xys))
-         ;_ (u/log points)
-         ]
-     ^{:key (gen-key)} [:polyline {:points points :stroke fill-color :fill "none"}]))
 
 (defn event-handler-fn [comms component e]
   (let [bounds (. (reagent/dom-node component) getBoundingClientRect)
@@ -110,11 +117,29 @@
 
 (defn all-points-component [my-lines]
   (into [:g {:key (gen-key)}]
-        (map #(point-component %) (mapcat identity my-lines))
-        ))
+        (map #(point-component %) (mapcat identity my-lines))))
+
+(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil}))
+
+(defn hover-visible? [last-mouse-moment]
+  (if (nil? last-mouse-moment)
+    false
+    (still-interested? last-mouse-moment (now))))
+
+(defn tick []
+  ;(u/log "TICK")
+  (let [now (now)
+        should-be-visible (hover-visible? (:last-mouse-moment @state))]
+    ;(u/log should-be-visible " at " now)
+    (when (not should-be-visible)
+      (swap! state assoc-in [:hover-pos] nil)
+      (swap! state assoc-in [:last-mouse-moment] nil)))
+  )
+
+(defonce time-updater (js/setInterval #(tick) 1000))
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
-  (let [{:keys [my-lines hover-pos]} @state-ref
+  (let [{:keys [my-lines hover-pos last-mouse-moment]} @state-ref
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
@@ -122,11 +147,10 @@
            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
            :style {:border "thin solid black"}}
      [all-points-component my-lines]
-     [hover-line-at hover-pos]
-     ]))
+     [hover-line-at (hover-visible? last-mouse-moment) hover-pos]]))
 
 (defn mount-root []
-  (let [paths-ratom (ratom {:my-lines [first-line] :hover-pos nil})
+  (let [paths-ratom state
         ch (chan)
         proc (controller ch paths-ratom)]
     (reagent/render-component
