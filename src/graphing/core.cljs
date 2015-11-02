@@ -8,7 +8,6 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [cljs.core.match.macros :refer [match]]))
 
-(enable-console-print!)
 (def ratom reagent/atom)
 
 (def uniqkey (atom 0))
@@ -17,7 +16,7 @@
     ;(u/log res)
     res))
 
-(def first-line [[10 10] [20 20] [30 30] [40 40] [50 50]])
+(def first-line {:name "First line" :colour "blue" :points [[10 10] [20 20] [30 30] [40 40] [50 50]]})
 (def height 480)
 (defn now-time [] (js/Date.))
 (defn seconds [js-date] (.getSeconds js-date))
@@ -67,36 +66,17 @@
 ;; Creates a point as a component
 ;;
 (defn point [fill x y]
+  (u/log fill)
   [:circle
    (merge point-defaults
           {:cx x
            :cy y
-           :fill fill})])
-
-(defn old-controller [inchan state-ref]
-  (go-loop [cur-x nil cur-y nil mouse-state :up]
-    (match [(<! inchan) mouse-state]
-           [({:type "mousedown" :x x :y y} :as e) :up]
-           (do
-             (recur x y :down))
-
-           [({:type "mousemove" :x x :y y} :as e) :down]
-           (do
-             (swap! state-ref update-in [:current-path] conj {:x x :y y})
-             (recur x y :down))
-
-           [({:type "mouseup" :x x :y y} :as e) :down]
-           (do
-             (swap! state-ref (fn [{:keys [current-path paths] :as state}]
-                                (assoc state :paths (conj paths current-path) :current-path [])))
-             (recur x y :up))
-
-           [s e] (recur cur-x cur-y mouse-state))))
+           :fill (u/to-rgb-str fill)})])
 
 (def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil}))
 (def current-line (count (:my-lines @state)))
 
-(defn new-controller [inchan state-ref]
+(defn controller [inchan state-ref]
   (go-loop [cur-x nil cur-y nil]
            (match [(<! inchan)]
 
@@ -113,15 +93,14 @@
 
                   [{:type "mouseup" :x x :y y}]
                   (do
-                    (swap! state-ref update-in [:my-lines current-line] (fn [coll-at-n] (vec (conj coll-at-n [x y]))))
+                    (u/log "Already cololur of current line is " (get-in state-ref [:my-lines current-line :colour]))
+                    (swap! state-ref update-in [:my-lines current-line :points] (fn [points-at-n] (vec (conj points-at-n [x y]))))
                     ;(u/log "When mouse up time is: " when-last-moved)
                     (recur x y))
 
                   [_]
                   (do
                     (recur cur-x cur-y)))))
-
-(def controller new-controller)
 
 (defn event-handler-fn [comms component e]
   (let [bounds (. (reagent/dom-node component) getBoundingClientRect)
@@ -130,12 +109,23 @@
      (put! comms {:type (.-type e) :x x :y y})
      nil))
 
-(defn point-component [fill [x y]]
-  ^{:key (gen-key)} [point fill x y])
+(defn point-component [{r :r g :g b :b} [x y]]
+  ^{:key (gen-key)} [point [r g b] x y])
+
+(defn points-from-lines [my-lines]
+  (for [line my-lines
+        :let [colour (:colour line)
+              component-fn (partial point-component colour)
+              points (:points line)]
+        point points
+        :let [component (component-fn point)]]
+    component))
 
 (defn all-points-component [my-lines]
   (into [:g {:key (gen-key)}]
-        (map #(point-component nil %) (mapcat identity my-lines))))
+        ;(map #(point-component nil %) (mapcat identity my-lines))
+        (points-from-lines my-lines)
+        ))
 
 (defn hover-visible? [last-mouse-moment now-moment]
   (if (nil? last-mouse-moment)
@@ -159,15 +149,15 @@
   (let [line (db/get-line name)
         colour (:colour line)
         positions (:positions line)
-        mapify-fn (fn [{x :x y :y}] [x y])
-        mapped-in (mapv mapify-fn positions)
+        mappify-fn (fn [{x :x y :y}] [x y])
+        mapped-in (mapv mappify-fn positions)
         count-existing-lines (count (:my-lines @state))]
-    (u/log mapped-in " where are already " count-existing-lines)
-    (swap! state assoc-in [:my-lines count-existing-lines] mapped-in)
-    (swap! state assoc-in [:my-lines count-existing-lines] colour)))
+    (u/log mapped-in " where are already " count-existing-lines " and new colour: " colour)
+    (swap! state assoc-in [:my-lines count-existing-lines :points] mapped-in)
+    (swap! state assoc-in [:my-lines count-existing-lines :colour] colour)))
 
 (defn trending-app [{:keys [state-ref comms] :as props}]
-  (let [{:keys [my-lines hover-pos last-mouse-moment]} @state-ref
+  (let [{:keys [my-lines hover-pos]} @state-ref
         component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
         ]
