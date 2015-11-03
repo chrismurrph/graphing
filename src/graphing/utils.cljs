@@ -23,7 +23,7 @@
 (defn round [n]
   (js/Math.round n))
 
-(defn to-rgb-str [[r g b]]
+(defn rgb-map-to-str [{r :r g :g b :b}]
   (str "rgb(" r "," g "," b ")"))
 
 ;;

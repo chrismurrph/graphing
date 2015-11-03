@@ -1,6 +1,7 @@
 (ns ^:figwheel-always graphing.graph-lines-db
   (:require [graphing.utils :as u]))
 
+(def black {:r 0 :g 0 :b 0})
 (def blue {:r 0 :g 51 :b 102})
 (def light-blue {:r 0 :g 204 :b 255})
 (def pink {:r 255 :g 0 :b 255})
@@ -9,9 +10,12 @@
 (def red {:r 255 :g 0 :b 0})
 (def gray {:r 64 :g 64 :b 64})
 
-(defn vector-form [colour-map]
-  (let [{r :r g :g b :b} colour-map]
-    [r g b]))
+;;
+;; Having colour as {:r :g :b} everywhere makes sense, so no need for this
+;;
+;(defn vector-form [colour-map]
+;  (let [{r :r g :g b :b} colour-map]
+;    [r g b]))
 
 (def local-mouse-pos (atom [0 0]))
 (def last-time-mouse-moved (atom 0))

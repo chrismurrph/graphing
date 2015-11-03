@@ -38,12 +38,12 @@
       (< 1 diff 4))))
 
 (def point-defaults
-  {:stroke "black"
+  {:stroke (u/rgb-map-to-str db/black)
    :stroke-width 2
    :r 5})
 
 (def segment-defaults
-  {:stroke "black"
+  {:stroke (u/rgb-map-to-str db/black)
    :stroke-width 2})
 
 (defn segment [height visible x-position]
@@ -65,13 +65,13 @@
 ;;
 ;; Creates a point as a component
 ;;
-(defn point [fill x y]
-  (u/log fill)
+(defn point [rgb-map x y]
+  (u/log rgb-map)
   [:circle
    (merge point-defaults
           {:cx x
            :cy y
-           :fill (u/to-rgb-str fill)})])
+           :fill (u/rgb-map-to-str rgb-map)})])
 
 (def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil}))
 (defn future-line [] (count (:my-lines @state)))
@@ -109,8 +109,8 @@
      (put! comms {:type (.-type e) :x x :y y})
      nil))
 
-(defn point-component [{r :r g :g b :b} [x y]]
-  ^{:key (gen-key)} [point [r g b] x y])
+(defn point-component [rgb-map [x y]]
+  ^{:key (gen-key)} [point rgb-map x y])
 
 (defn points-from-lines [my-lines]
   (for [line my-lines
