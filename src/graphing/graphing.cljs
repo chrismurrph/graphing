@@ -146,19 +146,21 @@
 
 (defonce _ (js/setInterval #(tick) 100))
 
-(defn read-in-line [mappify-point-fn name]
+(defn read-in-external-line [mappify-point-fn get-positions get-colour name]
   (u/log name)
   (let [line (db/get-line name)
-        colour (:colour line)
-        positions (:positions line)
+        colour (get-colour line)
+        positions (get-positions line)
         mapped-in (mapv mappify-point-fn positions)
         count-existing-lines (count (:my-lines @state))]
     (u/log mapped-in " where are already " count-existing-lines " and new colour: " colour)
     (swap! state assoc-in [:my-lines count-existing-lines :points] mapped-in)
     (swap! state assoc-in [:my-lines count-existing-lines :colour] colour)))
 
-(defn main-component [{:keys [handler-fn my-lines hover-pos height width trans-point]}]
-  (let [line-reader (partial read-in-line trans-point)]
+(defn main-component [options-map]
+  (let [{:keys [handler-fn my-lines hover-pos height width trans-point get-positions get-colour],
+         :or {height 480 width 640 trans-point identity}} options-map
+        line-reader (partial read-in-external-line trans-point get-positions get-colour)]
     [:div
      [:svg {:height height :width width
             :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
@@ -166,22 +168,27 @@
       [all-points-component my-lines]
       [(hover-line-at height) (not (nil? hover-pos)) hover-pos]]
      [:input {:type "button" :value "Methane"
-              :on-click (partial line-reader "Methane")}]
+              :on-click #(line-reader "Methane")}]
      [:input {:type "button" :value "Oxygen"
-              :on-click (partial line-reader "Oxygen")}]]))
+              :on-click #(line-reader "Oxygen")}]]))
 
-(defn trending-app [{:keys [state-ref comms height width trans-point trans-colour]}]
-  (let [component (reagent/current-component)
+(defn trending-app [options-map]
+  (let [{:keys [state-ref comms]} options-map
+        component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
-        args (into {:handler-fn handler-fn} @state-ref)
-        more-args (into args {:height height :width width :trans-point trans-point :trans-colour trans-colour})]
-    [main-component more-args]))
+        args (into (into {:handler-fn handler-fn} @state-ref) (apply dissoc options-map [:state-ref :comms]))]
+    [main-component args]))
 
-(defn init [{:keys [height width trans-point trans-colour], :or {height 480 width 640 trans-point identity trans-colour identity}}]
+;;
+;; keyword options:
+;; :height :width :trans-point :trans-colour :get-positions :get-colour
+;; All are defaulted - see main-component
+;;
+(defn init [options-map]
   (let [paths-ratom state
         ch (chan)
         proc (controller ch paths-ratom)
-        args {:state-ref paths-ratom :comms ch :height height :width width :trans-point trans-point :trans-colour trans-colour}]
+        args (into {:state-ref paths-ratom :comms ch} options-map)]
     (reagent/render-component
       [trending-app args]
       (.-body js/document))
