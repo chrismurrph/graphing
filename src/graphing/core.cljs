@@ -16,7 +16,7 @@
     ;(u/log res)
     res))
 
-(def first-line {:name "First line" :colour "blue" :points [[10 10] [20 20] [30 30] [40 40] [50 50]]})
+(def first-line {:name "First line" :colour db/light-blue :points [[10 10] [20 20] [30 30] [40 40] [50 50]]})
 (def height 480)
 (defn now-time [] (js/Date.))
 (defn seconds [js-date] (.getSeconds js-date))
@@ -74,7 +74,7 @@
            :fill (u/to-rgb-str fill)})])
 
 (def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil}))
-(def current-line (count (:my-lines @state)))
+(defn future-line [] (count (:my-lines @state)))
 
 (defn controller [inchan state-ref]
   (go-loop [cur-x nil cur-y nil]
@@ -92,8 +92,8 @@
                     (recur x y))
 
                   [{:type "mouseup" :x x :y y}]
-                  (do
-                    (u/log "Already cololur of current line is " (get-in state-ref [:my-lines current-line :colour]))
+                  (let [current-line (dec (future-line))]
+                    (u/log "Already colour of current line at " current-line " is " (get-in @state-ref [:my-lines current-line :colour]))
                     (swap! state-ref update-in [:my-lines current-line :points] (fn [points-at-n] (vec (conj points-at-n [x y]))))
                     ;(u/log "When mouse up time is: " when-last-moved)
                     (recur x y))
@@ -115,6 +115,7 @@
 (defn points-from-lines [my-lines]
   (for [line my-lines
         :let [colour (:colour line)
+              _ (u/log "Colour of " (:name line) " is " colour)
               component-fn (partial point-component colour)
               points (:points line)]
         point points

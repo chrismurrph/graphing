@@ -9,6 +9,10 @@
 (def red {:r 255 :g 0 :b 0})
 (def gray {:r 64 :g 64 :b 64})
 
+(defn vector-form [colour-map]
+  (let [{r :r g :g b :b} colour-map]
+    [r g b]))
+
 (def local-mouse-pos (atom [0 0]))
 (def last-time-mouse-moved (atom 0))
 
