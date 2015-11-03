@@ -2,16 +2,18 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async
              :refer [<! >! chan close! put!]]
-            [graphing.graph-lines-db :as db]
-            [graphing.utils :as u])
+            [graphing.graph-lines-db :refer [light-blue black get-line]]
+            [graphing.utils :refer [log]]
+            )
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [cljs.core.match.macros :refer [match]]))
 
 (def ratom reagent/atom)
 
-(def first-line {:name "First line" :colour db/light-blue :points [[10 10] [20 20] [30 30] [40 40] [50 50]]})
+(def first-line {:name "First line" :colour light-blue :points [[10 10] [20 20] [30 30] [40 40] [50 50]]})
 
-;(def height 480)
+(defn rgb-map-to-str [{r :r g :g b :b}]
+  (str "rgb(" r "," g "," b ")"))
 
 (def uniqkey (atom 0))
 (defn gen-key []
@@ -39,12 +41,12 @@
       (< 1 diff 4))))
 
 (def point-defaults
-  {:stroke (u/rgb-map-to-str db/black)
+  {:stroke (rgb-map-to-str black)
    :stroke-width 2
    :r 5})
 
 (def segment-defaults
-  {:stroke (u/rgb-map-to-str db/black)
+  {:stroke (rgb-map-to-str black)
    :stroke-width 2})
 
 (defn segment [height visible x-position]
@@ -67,12 +69,12 @@
 ;; Creates a point as a component
 ;;
 (defn point [rgb-map x y]
-  (u/log rgb-map)
+  (log rgb-map)
   [:circle
    (merge point-defaults
           {:cx x
            :cy y
-           :fill (u/rgb-map-to-str rgb-map)})])
+           :fill (rgb-map-to-str rgb-map)})])
 
 (def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil}))
 (defn future-line [] (count (:my-lines @state)))
@@ -94,7 +96,7 @@
 
                   [{:type "mouseup" :x x :y y}]
                   (let [current-line (dec (future-line))]
-                    (u/log "Already colour of current line at " current-line " is " (get-in @state-ref [:my-lines current-line :colour]))
+                    (log "Already colour of current line at " current-line " is " (get-in @state-ref [:my-lines current-line :colour]))
                     (swap! state-ref update-in [:my-lines current-line :points] (fn [points-at-n] (vec (conj points-at-n [x y]))))
                     ;(u/log "When mouse up time is: " when-last-moved)
                     (recur x y))
@@ -116,7 +118,7 @@
 (defn points-from-lines [my-lines]
   (for [line my-lines
         :let [colour (:colour line)
-              _ (u/log "Colour of " (:name line) " is " colour)
+              _ (log "Colour of " (:name line) " is " colour)
               component-fn (partial point-component colour)
               points (:points line)]
         point points
@@ -147,13 +149,13 @@
 (defonce _ (js/setInterval #(tick) 100))
 
 (defn read-in-external-line [mappify-point-fn get-positions get-colour name]
-  (u/log name)
-  (let [line (db/get-line name)
+  (log name)
+  (let [line (get-line name)
         colour (get-colour line)
         positions (get-positions line)
         mapped-in (mapv mappify-point-fn positions)
         count-existing-lines (count (:my-lines @state))]
-    (u/log mapped-in " where are already " count-existing-lines " and new colour: " colour)
+    (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
     (swap! state assoc-in [:my-lines count-existing-lines :points] mapped-in)
     (swap! state assoc-in [:my-lines count-existing-lines :colour] colour)))
 
@@ -181,8 +183,9 @@
 
 ;;
 ;; keyword options:
-;; :height :width :trans-point :trans-colour :get-positions :get-colour
+;; :height :width :trans-point :get-positions :get-colour
 ;; All are defaulted - see main-component
+;; Note that :trans-colour does not exist - colours have to be of shape {:r :g :b}
 ;;
 (defn init [options-map]
   (let [paths-ratom state

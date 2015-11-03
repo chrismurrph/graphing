@@ -23,9 +23,6 @@
 (defn round [n]
   (js/Math.round n))
 
-(defn rgb-map-to-str [{r :r g :g b :b}]
-  (str "rgb(" r "," g "," b ")"))
-
 ;;
 ;; from-world and to-world are maps of type {:min _ :max _}
 ;; These max and min are inclusive, so the exact middle when :min 0 and :max 10 is 5
