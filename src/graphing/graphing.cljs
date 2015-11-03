@@ -11,7 +11,7 @@
 
 (def first-line {:name "First line" :colour db/light-blue :points [[10 10] [20 20] [30 30] [40 40] [50 50]]})
 
-(def height 480)
+;(def height 480)
 
 (def uniqkey (atom 0))
 (defn gen-key []
@@ -61,7 +61,7 @@
 ;;
 ;; Need to supply visible and x-position to display it
 ;;
-(def hover-line-at (partial segment height))
+(defn hover-line-at [height] (partial segment height))
 
 ;;
 ;; Creates a point as a component
@@ -144,46 +144,46 @@
       (swap! state assoc-in [:last-mouse-moment] nil)))
   )
 
-(defonce time-updater (js/setInterval #(tick) 100))
+(defonce _ (js/setInterval #(tick) 100))
 
-(defn read-in-line [name]
+(defn read-in-line [mappify-point-fn name]
   (u/log name)
   (let [line (db/get-line name)
         colour (:colour line)
         positions (:positions line)
-        mappify-fn (fn [{x :x y :y}] [x y])
-        mapped-in (mapv mappify-fn positions)
+        mapped-in (mapv mappify-point-fn positions)
         count-existing-lines (count (:my-lines @state))]
     (u/log mapped-in " where are already " count-existing-lines " and new colour: " colour)
     (swap! state assoc-in [:my-lines count-existing-lines :points] mapped-in)
     (swap! state assoc-in [:my-lines count-existing-lines :colour] colour)))
 
-(defn main-component [{:keys [handler-fn my-lines hover-pos]}]
-  [:div
-   [:svg {:height height :width 640
-          :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
-          :style {:border "thin solid black"}}
-    [all-points-component my-lines]
-    [hover-line-at (not (nil? hover-pos)) hover-pos]]
-   [:input {:type "button" :value "Methane"
-            :on-click (partial read-in-line "Methane")}]
-   [:input {:type "button" :value "Oxygen"
-            :on-click (partial read-in-line "Oxygen")}]])
+(defn main-component [{:keys [handler-fn my-lines hover-pos height width trans-point]}]
+  (let [line-reader (partial read-in-line trans-point)]
+    [:div
+     [:svg {:height height :width width
+            :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
+            :style {:border "thin solid black"}}
+      [all-points-component my-lines]
+      [(hover-line-at height) (not (nil? hover-pos)) hover-pos]]
+     [:input {:type "button" :value "Methane"
+              :on-click (partial line-reader "Methane")}]
+     [:input {:type "button" :value "Oxygen"
+              :on-click (partial line-reader "Oxygen")}]]))
 
-(defn trending-app [{:keys [state-ref comms]}]
-  (let [{:keys [my-lines hover-pos]} @state-ref
-        component (reagent/current-component)
+(defn trending-app [{:keys [state-ref comms height width trans-point trans-colour]}]
+  (let [component (reagent/current-component)
         handler-fn (partial event-handler-fn comms component)
-        ]
-    [main-component {:handler-fn handler-fn :my-lines my-lines :hover-pos hover-pos}]
-    ))
+        args (into {:handler-fn handler-fn} @state-ref)
+        more-args (into args {:height height :width width :trans-point trans-point :trans-colour trans-colour})]
+    [main-component more-args]))
 
-(defn init []
+(defn init [{:keys [height width trans-point trans-colour], :or {height 480 width 640 trans-point identity trans-colour identity}}]
   (let [paths-ratom state
         ch (chan)
-        proc (controller ch paths-ratom)]
+        proc (controller ch paths-ratom)
+        args {:state-ref paths-ratom :comms ch :height height :width width :trans-point trans-point :trans-colour trans-colour}]
     (reagent/render-component
-      [trending-app {:state-ref paths-ratom :comms ch}]
+      [trending-app args]
       (.-body js/document))
     (go
       (let [exit (<! proc)]

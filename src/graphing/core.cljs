@@ -7,10 +7,10 @@
             [graphing.graphing :as g])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
-(def height 480)
+(def translate-point (fn [{x :x y :y}] [x y]))
 
 (defn mount-root []
-  (g/init))
+  (g/init {:height 350 :trans-point translate-point}))
 
 (defn ^:export run []
     (mount-root))
