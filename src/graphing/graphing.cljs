@@ -24,9 +24,12 @@
 (defn now-time [] (js/Date.))
 (defn seconds [js-date] (.getSeconds js-date))
 
+;;
+;; Currently leaving up forever. Will prolly re-instate use of this later...
+;;
 (defn still-interested? [past-time current-time]
   (let [diff (- (seconds current-time) (seconds past-time))]
-    (< diff 10)))
+    (< diff 30)))
 
 (def point-defaults
   {:stroke (rgb-map-to-str black)
@@ -64,7 +67,7 @@
            :cy y
            :fill (rgb-map-to-str rgb-map)})])
 
-(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false}))
+(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false :labels-visible? false}))
 (defn my-lines-size [] (count (:my-lines @state)))
 
 (defn controller [inchan state-ref]
@@ -80,6 +83,7 @@
                       (when (not in-sticky-time?)
                         (swap! state-ref assoc-in [:hover-pos] x)
                         (swap! state-ref assoc-in [:last-mouse-moment] now-moment)
+                        (swap! state-ref assoc-in [:labels-visible?] false)
                         ;(u/log (get-in @state-ref [:hover-pos]))
                         ))
                     (recur x y cur-x cur-y))
@@ -121,10 +125,10 @@
         (points-from-lines my-lines)
         ))
 
-(defn hover-visible? [last-mouse-moment now-moment]
-  (if (nil? last-mouse-moment)
-    false
-    (still-interested? last-mouse-moment now-moment)))
+;(defn hover-visible? [last-mouse-moment now-moment]
+;  (if (nil? last-mouse-moment)
+;    false
+;    (still-interested? last-mouse-moment now-moment)))
 
 ;;
 ;; When in sticky time we want mouse movement to be ignored.
@@ -141,14 +145,16 @@
                               (< 1 diff 4))))
         now (now-time)
         last-time-moved (:last-mouse-moment @state)
-        should-be-visible (hover-visible? last-time-moved now)
+        ;should-be-visible (hover-visible? last-time-moved now)
         sticking (in-sticky-time? last-time-moved now)
         _ (when sticking (log "STICK: " sticking))]
     ;(u/log should-be-visible " at " now)
     (swap! state assoc-in [:in-sticky-time?] sticking)
-    (when (not should-be-visible)
-      (swap! state assoc-in [:hover-pos] nil)
-      (swap! state assoc-in [:last-mouse-moment] nil))))
+    (when sticking
+      (swap! state assoc-in [:labels-visible?] true))
+    ;(swap! state assoc-in [:hover-pos] nil)
+    ;(swap! state assoc-in [:last-mouse-moment] nil)
+    ))
 
 (defonce _ (js/setInterval #(tick) 100))
 
@@ -164,7 +170,7 @@
     (swap! state assoc-in [:my-lines count-existing-lines :colour] colour)))
 
 (defn main-component [options-map]
-  (let [{:keys [handler-fn my-lines hover-pos in-sticky-time? height width trans-point get-positions get-colour],
+  (let [{:keys [handler-fn my-lines hover-pos in-sticky-time? labels-visible? height width trans-point get-positions get-colour],
          :or {height 480 width 640 trans-point identity}} options-map
         line-reader (partial read-in-external-line trans-point get-positions get-colour)]
     [:div
@@ -173,7 +179,7 @@
             :style {:border "thin solid black"}}
       [all-points-component my-lines]
       [(hover-line-at height) (not (nil? hover-pos)) hover-pos]
-      (when in-sticky-time? [:text {:x 100 :y 100} "Hi Mum"])]
+      (when labels-visible? [:text {:x 100 :y 100} "Hi Mum"])]
      [:input {:type "button" :value "Methane"
               :on-click #(line-reader "Methane")}]
      [:input {:type "button" :value "Oxygen"
