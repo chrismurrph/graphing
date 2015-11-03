@@ -75,7 +75,7 @@
                   (let [now-moment (now-time)
                         in-sticky-time? (:in-sticky-time? @state-ref)
                         diff (distance [old-x old-y] [cur-x cur-y])
-                        is-flick (> diff 2)]
+                        is-flick (> diff 10)]
                     (when (not is-flick)
                       (when (not in-sticky-time?)
                         (swap! state-ref assoc-in [:hover-pos] x)
@@ -138,12 +138,14 @@
                           (if (or (nil? current-time) (nil? past-time))
                             false
                             (let [diff (- (seconds current-time) (seconds past-time))]
-                              (< 1.2 diff 4))))
+                              (< 1 diff 4))))
         now (now-time)
         last-time-moved (:last-mouse-moment @state)
-        should-be-visible (hover-visible? last-time-moved now)]
+        should-be-visible (hover-visible? last-time-moved now)
+        sticking (in-sticky-time? last-time-moved now)
+        _ (when sticking (log "STICK: " sticking))]
     ;(u/log should-be-visible " at " now)
-    (swap! state assoc-in [:in-sticky-time?] (in-sticky-time? last-time-moved now))
+    (swap! state assoc-in [:in-sticky-time?] sticking)
     (when (not should-be-visible)
       (swap! state assoc-in [:hover-pos] nil)
       (swap! state assoc-in [:last-mouse-moment] nil))))
@@ -162,7 +164,7 @@
     (swap! state assoc-in [:my-lines count-existing-lines :colour] colour)))
 
 (defn main-component [options-map]
-  (let [{:keys [handler-fn my-lines hover-pos height width trans-point get-positions get-colour],
+  (let [{:keys [handler-fn my-lines hover-pos in-sticky-time? height width trans-point get-positions get-colour],
          :or {height 480 width 640 trans-point identity}} options-map
         line-reader (partial read-in-external-line trans-point get-positions get-colour)]
     [:div
@@ -170,7 +172,8 @@
             :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
             :style {:border "thin solid black"}}
       [all-points-component my-lines]
-      [(hover-line-at height) (not (nil? hover-pos)) hover-pos]]
+      [(hover-line-at height) (not (nil? hover-pos)) hover-pos]
+      (when in-sticky-time? [:text {:x 100 :y 100} "Hi Mum"])]
      [:input {:type "button" :value "Methane"
               :on-click #(line-reader "Methane")}]
      [:input {:type "button" :value "Oxygen"
