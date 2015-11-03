@@ -1,9 +1,5 @@
 (ns graphing.core
-  (:require [reagent.core :as reagent]
-            [cljs.core.async :as async
-             :refer [<! >! chan close!]]
-            [graphing.graph-lines-db :as db]
-            [graphing.utils :as u]
+  (:require [graphing.graph-lines-db :as db]
             [graphing.graphing :as g])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 

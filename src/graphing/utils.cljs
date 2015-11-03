@@ -23,6 +23,18 @@
 (defn round [n]
   (js/Math.round n))
 
+(defn exp [x n]
+  (reduce * (repeat n x)))
+
+(def sqrt (.-sqrt js/Math))
+
+(defn distance [[x1 y1] [x2 y2]]
+  (let [x-delta-squared (exp (- x2 x1) 2)
+        y-delta-squared (exp (- y2 y1) 2)
+        sum-of-differences (+ x-delta-squared y-delta-squared)
+        now-squared (sqrt sum-of-differences)]
+    (round now-squared)))
+
 ;;
 ;; from-world and to-world are maps of type {:min _ :max _}
 ;; These max and min are inclusive, so the exact middle when :min 0 and :max 10 is 5
