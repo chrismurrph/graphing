@@ -133,12 +133,13 @@
 (defn get-names []
   (map :name (get-in @state [:my-lines])))
 
-(defn show-labels-moment [trans-point-fn x]
+(defn show-labels-moment [translator x]
   (let [names (get-names)
-        _ (log names)
-        surrounding-at (partial enclosed-by x)
+        _ (log "names: " names)
+        surrounding-at (partial enclosed-by (:horizontally translator) x)
+        trans-point-fn (:whole-point translator)
         enclosed-by-res (remove nil? (map surrounding-at names))
-        _ (log enclosed-by-res)
+        _ (log "enclosed result: " enclosed-by-res)
         y-intersects (for [[left-of right-of] enclosed-by-res
                            :let [left-translated (trans-point-fn left-of)
                                  right-translated (trans-point-fn right-of)
@@ -161,7 +162,7 @@
                             false
                             (let [diff (- (seconds current-time) (seconds past-time))]
                               (< 1 diff 4))))
-        show-labels-fn (partial show-labels-moment (-> translator :whole-point))]
+        show-labels-fn (partial show-labels-moment translator)]
   (fn []
     (let [now (now-time)
           last-time-moved (:last-mouse-moment @state)

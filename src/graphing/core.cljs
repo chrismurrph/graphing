@@ -12,6 +12,10 @@
 (def get-colour :colour)
 (def graph-width 640)
 (def graph-height 250)
+
+;;
+;; Translation is always business to screen, not the other way round
+;;
 (def horizontally-translate (db/scale-fn graph-width))
 (def vertically-translate (db/scale-fn graph-height))
 
