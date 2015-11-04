@@ -2,8 +2,8 @@
   :description "dev project to get trending going in svg with reagent"
   :url "http://localhost:3449/"
 
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/clojurescript "0.0-3211"]
+  :dependencies [[org.clojure/clojure "1.7.0"]
+                 [org.clojure/clojurescript "1.7.145"]
 		 [reagent "0.5.1"]
 		 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
 		 [org.clojure/core.match "0.2.1"]

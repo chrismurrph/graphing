@@ -114,7 +114,8 @@
                     positions)
         ]
     (let [result (:res res)
-          _ (u/log "RES: " result)]
+          ;_ (u/log "RES: " result)
+          ]
       (if (empty? result)
         nil
         result))))

@@ -51,6 +51,9 @@
         ]
     rounded-res))
 
+(defn bisect-vertical-at [[x0 y0] [x1 y1] x]
+  (scale {:min x0 :max x1} {:min y0 :max y1} x))
+
 (defn style [& info]
   {:style (.trim (apply str (map #(let [[kwd val] %]
                                    (str (name kwd) " " val "; "))

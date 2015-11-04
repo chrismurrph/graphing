@@ -157,14 +157,16 @@
         last-time-moved (:last-mouse-moment @state)
         currently-sticky (get-in @state [:in-sticky-time?])
         now-sticking (in-sticky-time? last-time-moved now)
-        x (get-in @state [:hover-pos])]
-    (when (and now-sticking (not currently-sticky))
-      (show-labels-moment x)
-      (swap! state assoc-in [:labels-visible?] true)
-      )
-    (swap! state assoc-in [:in-sticky-time?] now-sticking)
-    ;(swap! state assoc-in [:hover-pos] nil)
-    ;(swap! state assoc-in [:last-mouse-moment] nil)
+        x (get-in @state [:hover-pos])
+        labels-already-showing (get-in @state [:labels-visible?])]
+    (if (not currently-sticky)
+      (when now-sticking
+        (when (not labels-already-showing)
+          (show-labels-moment x)
+          (swap! state assoc-in [:labels-visible?] true)
+          (swap! state assoc-in [:in-sticky-time?] true)))
+      (when (not now-sticking)
+        (swap! state assoc-in [:in-sticky-time?] false)))
     ))
 
 (defonce _ (js/setInterval #(tick) 100))
