@@ -38,7 +38,7 @@
 
 (def segment-defaults
   {:stroke (rgb-map-to-str black)
-   :stroke-width 2})
+   :stroke-width 1})
 
 (defn segment [height visible x-position]
   (let [from [x-position 0]
@@ -133,14 +133,19 @@
 (defn get-names []
   (map :name (get-in @state [:my-lines])))
 
-(defn show-labels-moment [x]
+(defn show-labels-moment [trans-point-fn x]
   (let [names (get-names)
         _ (log names)
         surrounding-at (partial enclosed-by x)
         enclosed-by-res (remove nil? (map surrounding-at names))
         _ (log enclosed-by-res)
-        y-intersects (for [[{x0 :x y0 :y} {x1 :x y1 :y}] enclosed-by-res
-                           :let [y-intersect (bisect-vertical-between [x0 y0] [x1 y1] x)]]
+        y-intersects (for [[left-of right-of] enclosed-by-res
+                           :let [left-translated (trans-point-fn left-of)
+                                 right-translated (trans-point-fn right-of)
+                                 _ (log "left: " left-translated)
+                                 _ (log "right: " right-translated)
+                                 _ (log "x: " x)
+                                 y-intersect (bisect-vertical-between left-translated right-translated x)]]
                        y-intersect)]
     (log y-intersects)))
 
@@ -150,30 +155,28 @@
 ;; A further refinement would be for the moving away to make it 'stuck'
 ;; (and clicking would also have to have this effect)
 ;;
-(defn tick []
-  ;(u/log "TICK")
+(defn tick [translator]
   (let [in-sticky-time? (fn [past-time current-time]
                           (if (or (nil? current-time) (nil? past-time))
                             false
                             (let [diff (- (seconds current-time) (seconds past-time))]
                               (< 1 diff 4))))
-        now (now-time)
-        last-time-moved (:last-mouse-moment @state)
-        currently-sticky (get-in @state [:in-sticky-time?])
-        now-sticking (in-sticky-time? last-time-moved now)
-        x (get-in @state [:hover-pos])
-        labels-already-showing (get-in @state [:labels-visible?])]
-    (if (not currently-sticky)
-      (when now-sticking
-        (when (not labels-already-showing)
-          (show-labels-moment x)
-          (swap! state assoc-in [:labels-visible?] true)
-          (swap! state assoc-in [:in-sticky-time?] true)))
-      (when (not now-sticking)
-        (swap! state assoc-in [:in-sticky-time?] false)))
-    ))
-
-(def _ (js/setInterval #(tick) 100))
+        show-labels-fn (partial show-labels-moment (-> translator :whole-point))]
+  (fn []
+    (let [now (now-time)
+          last-time-moved (:last-mouse-moment @state)
+          currently-sticky (get-in @state [:in-sticky-time?])
+          now-sticking (in-sticky-time? last-time-moved now)
+          x (get-in @state [:hover-pos])
+          labels-already-showing (get-in @state [:labels-visible?])]
+      (if (not currently-sticky)
+        (when now-sticking
+          (when (not labels-already-showing)
+            (show-labels-fn x)
+            (swap! state assoc-in [:labels-visible?] true)
+            (swap! state assoc-in [:in-sticky-time?] true)))
+        (when (not now-sticking)
+          (swap! state assoc-in [:in-sticky-time?] false)))))))
 
 (defn read-in-external-line [mappify-point-fn get-positions get-colour name]
   (log name)
@@ -187,9 +190,9 @@
     (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
 (defn main-component [options-map]
-  (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width trans-point get-positions get-colour],
-         :or {height 480 width 640 trans-point identity}} options-map
-        line-reader (partial read-in-external-line trans-point get-positions get-colour)]
+  (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour],
+         :or {height 480 width 640}} options-map
+        line-reader (partial read-in-external-line (-> translator :whole-point) get-positions get-colour)]
     [:div
      [:svg {:height height :width width
             :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
@@ -219,7 +222,9 @@
   (let [paths-ratom state
         ch (chan)
         proc (controller ch paths-ratom)
-        args (into {:state-ref paths-ratom :comms ch} options-map)]
+        args (into {:state-ref paths-ratom :comms ch} options-map)
+        tick-with-trans (tick (-> options-map :translator))
+        _ (js/setInterval #(tick-with-trans) 500)]
     (reagent/render-component
       [trending-app args]
       (.-body js/document))

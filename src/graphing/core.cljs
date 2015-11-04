@@ -22,9 +22,10 @@
 ;; for both x and y. You can only see that if you look at the source of db.
 ;;
 (def translate-point (fn [{x :x y :y}] [(horizontally-translate x) (vertically-translate y)]))
+(def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
 
 (defn mount-root []
-  (g/init {:height graph-height :width graph-width :trans-point translate-point :get-positions get-positions :get-colour get-colour}))
+  (g/init {:height graph-height :width graph-width :translator translator :get-positions get-positions :get-colour get-colour}))
 
 (defn ^:export run []
     (mount-root))
