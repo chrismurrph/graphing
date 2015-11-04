@@ -51,8 +51,14 @@
         ]
     rounded-res))
 
-(defn bisect-vertical-at [[x0 y0] [x1 y1] x]
-  (scale {:min x0 :max x1} {:min y0 :max y1} x))
+(defn bisect-vertical-between [[x0 y0] [x1 y1] x]
+  (let [x-diff (- x1 x0)
+        y-diff (- y1 y0)
+        ratio (/ y-diff x-diff)
+        x-from-start (- x x0)
+        res1 (* x-from-start ratio)
+        res2 (+ y0 res1)]
+    res2))
 
 (defn style [& info]
   {:style (.trim (apply str (map #(let [[kwd val] %]

@@ -3,7 +3,7 @@
             [cljs.core.async :as async
              :refer [<! >! chan close! put!]]
             [graphing.graph-lines-db :refer [light-blue black get-external-line enclosed-by]]
-            [graphing.utils :refer [log distance]]
+            [graphing.utils :refer [log distance bisect-vertical-between]]
             )
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [cljs.core.match.macros :refer [match]]))
@@ -137,8 +137,12 @@
   (let [names (get-names)
         _ (log names)
         surrounding-at (partial enclosed-by x)
-        enclosed-by-res (map surrounding-at names)]
-    (log "Show labels now for " enclosed-by-res)))
+        enclosed-by-res (remove nil? (map surrounding-at names))
+        _ (log enclosed-by-res)
+        y-intersects (for [[{x0 :x y0 :y} {x1 :x y1 :y}] enclosed-by-res
+                           :let [y-intersect (bisect-vertical-between [x0 y0] [x1 y1] x)]]
+                       y-intersect)]
+    (log y-intersects)))
 
 ;;
 ;; When in sticky time we want mouse movement to be ignored.
@@ -169,7 +173,7 @@
         (swap! state assoc-in [:in-sticky-time?] false)))
     ))
 
-(defonce _ (js/setInterval #(tick) 100))
+(def _ (js/setInterval #(tick) 100))
 
 (defn read-in-external-line [mappify-point-fn get-positions get-colour name]
   (log name)
@@ -183,7 +187,7 @@
     (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
 (defn main-component [options-map]
-  (let [{:keys [handler-fn my-lines hover-pos in-sticky-time? labels-visible? height width trans-point get-positions get-colour],
+  (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width trans-point get-positions get-colour],
          :or {height 480 width 640 trans-point identity}} options-map
         line-reader (partial read-in-external-line trans-point get-positions get-colour)]
     [:div
