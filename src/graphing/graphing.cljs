@@ -2,7 +2,7 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async
              :refer [<! >! chan close! put!]]
-            [graphing.graph-lines-db :refer [light-blue black get-line]]
+            [graphing.graph-lines-db :refer [light-blue black get-external-line enclosed-by]]
             [graphing.utils :refer [log distance]]
             )
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
@@ -130,6 +130,16 @@
 ;    false
 ;    (still-interested? last-mouse-moment now-moment)))
 
+(defn get-names []
+  (map :name (get-in @state [:my-lines])))
+
+(defn show-labels-moment [x]
+  (let [names (get-names)
+        _ (log names)
+        surrounding-at (partial enclosed-by x)
+        enclosed-by-res (map surrounding-at names)]
+    (log "Show labels now for " enclosed-by-res)))
+
 ;;
 ;; When in sticky time we want mouse movement to be ignored.
 ;; Thus if user drags to a place and leaves it there for a second, he can then move the cursor out of the way
@@ -145,13 +155,14 @@
                               (< 1 diff 4))))
         now (now-time)
         last-time-moved (:last-mouse-moment @state)
-        ;should-be-visible (hover-visible? last-time-moved now)
-        sticking (in-sticky-time? last-time-moved now)
-        _ (when sticking (log "STICK: " sticking))]
-    ;(u/log should-be-visible " at " now)
-    (swap! state assoc-in [:in-sticky-time?] sticking)
-    (when sticking
-      (swap! state assoc-in [:labels-visible?] true))
+        currently-sticky (get-in @state [:in-sticky-time?])
+        now-sticking (in-sticky-time? last-time-moved now)
+        x (get-in @state [:hover-pos])]
+    (when (and now-sticking (not currently-sticky))
+      (show-labels-moment x)
+      (swap! state assoc-in [:labels-visible?] true)
+      )
+    (swap! state assoc-in [:in-sticky-time?] now-sticking)
     ;(swap! state assoc-in [:hover-pos] nil)
     ;(swap! state assoc-in [:last-mouse-moment] nil)
     ))
@@ -160,14 +171,14 @@
 
 (defn read-in-external-line [mappify-point-fn get-positions get-colour name]
   (log name)
-  (let [line (get-line name)
+  (let [line (get-external-line name)
         colour (get-colour line)
         positions (get-positions line)
         mapped-in (mapv mappify-point-fn positions)
-        count-existing-lines (count (:my-lines @state))]
+        count-existing-lines (count (:my-lines @state))
+        new-line {:name name :points mapped-in :colour colour}]
     (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
-    (swap! state assoc-in [:my-lines count-existing-lines :points] mapped-in)
-    (swap! state assoc-in [:my-lines count-existing-lines :colour] colour)))
+    (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
 (defn main-component [options-map]
   (let [{:keys [handler-fn my-lines hover-pos in-sticky-time? labels-visible? height width trans-point get-positions get-colour],

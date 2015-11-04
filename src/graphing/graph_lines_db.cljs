@@ -47,7 +47,7 @@
 (def mouse-at-x (atom 350))
 (def mouse-at-ys (atom [{:name "Hydrogen" :value 0.07 :y 300} {:name "Boron" :value 0.17 :y 310}]))
 
-(defn get-line [name]
+(defn get-external-line [name]
   (first (filter #(= name (-> % :name)) @lines)))
 
 ;;
@@ -68,7 +68,7 @@
 ;; number of positions in the line tells how much squashing is going on.
 ;;
 (defn find-x-duplicates [scaling-fn line-name]
-  (let [by-scaled-x (map #(vector (scaling-fn (:x %)) %) (:positions (get-line line-name)))
+  (let [by-scaled-x (map #(vector (scaling-fn (:x %)) %) (:positions (get-external-line line-name)))
         grouping-fn (fn [[k v]] k)
         grouped (group-by grouping-fn by-scaled-x)
         filter-fn (fn [[k v]] (> (count v) 1))
@@ -91,23 +91,33 @@
 ;; the first or last point there will still be a result.
 ;;
 (defn enclosed-by [x line-name]
-  (let [line (get-line line-name)
+  (let [line (get-external-line line-name)
         positions (:positions line)
+        ;_ (u/log "positions to reduce over: " positions)
         res (reduce (fn [acc ele] (if (empty? (:res acc))
-                                    (if (= (:x ele) x)
-                                      {:res [ele ele]}
-                                      (if (> (:x ele) x)
-                                        {:res [(:prev acc)] :prev ele} ;use the prior element
-                                        {:res [] :prev ele}) ;only update prior element
-                                    (if (= 1 (count (:res acc)))
-                                      {:res (conj (:res acc) (:prev acc))}
-                                      acc)))) ;have answer already
+                                    (let [cur-x (:x ele)]
+                                      (if (= cur-x x)
+                                        {:res [ele ele]}
+                                        (if (> cur-x x)
+                                          {:res [(:prev acc)] :prev ele} ;use the prior element
+                                          {:res [] :prev ele} ;only update prior element
+                                          )
+                                        )
+                                      )
+                                    (let [result-so-far (:res acc)]
+                                      (if (= 1 (count result-so-far))
+                                        {:res (conj result-so-far (:prev acc))}
+                                        acc)
+                                      )
+                                    ))
                     []
                     positions)
-        _ (u/log res)]
-    (if (empty? (:res res))
-      nil
-      res)))
+        ]
+    (let [result (:res res)
+          _ (u/log "RES: " result)]
+      (if (empty? result)
+        nil
+        result))))
 
 (defn get-names []
   (map :name @lines))
