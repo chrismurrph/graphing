@@ -26,7 +26,7 @@
 ;; how to scale across from one system to another, going TO the graph's geometry. Our geometry happens to be 0-999
 ;; for both x and y. You can only see that if you look at the source of db.
 ;;
-(def translate-point (fn [{x :x y :y}] [(horizontally-translate x) (vertically-translate y)]))
+(def translate-point (fn [{x :x y :y val :val}] [(horizontally-translate x) (vertically-translate y) val]))
 (def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
 
 (defn mount-root []

@@ -4,16 +4,25 @@
              :refer [<! >! chan close! put!]]
             [graphing.graph-lines-db :refer [light-blue black get-external-line]]
             [graphing.utils :refer [log distance bisect-vertical-between]]
+            [goog.string :as gstring]
+            [goog.string.format]
             )
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [cljs.core.match.macros :refer [match]]))
 
 (def ratom reagent/atom)
 
-(def first-line {:name "First line" :colour light-blue :points [[10 10] [20 20] [30 30] [40 40] [50 50]]})
+;;
+;; [x y real-value]
+;; Note that y is greater as lower but real value will be smaller as lower
+;;
+(def first-line {:name "First line" :colour light-blue :dec-places 3 :units "" :points [[10 10 0.511] [20 20 0.411] [30 30 0.311] [40 40 0.211] [50 50 0.111]]})
 
 (defn rgb-map-to-str [{r :r g :g b :b}]
   (str "rgb(" r "," g "," b ")"))
+
+(defn format-as-str [dec-pl val]
+  (gstring/format (str "%." dec-pl "f") val))
 
 (def uniqkey (atom 0))
 (defn gen-key []
@@ -41,26 +50,28 @@
    :stroke-width 1})
 
 (defn plum-line [height visible x-position]
-  (let [from [x-position 0]
-        to [x-position height]
-        res (when visible [:line
+  (let [res (when visible [:line
                            (merge line-defaults
-                                  {:x1 (first from) :y1 (second from)
-                                   :x2 (first to) :y2 (second to)})])]
+                                  {:x1 x-position :y1 0
+                                   :x2 x-position :y2 height})])]
     res))
+
+(defn insert-labels [x drop-infos]
+  (for [drop-info drop-infos]
+    ^{:key (gen-key)}[:text {:x (+ x 10) :y (+ (:proportional-y drop-info) 4) :font-size "0.8em"} (format-as-str (or (:dec-places drop-info) 2) (:proportional-val drop-info))]))
 
 ;;
 ;; Many lines coming out from the plum line
 ;;
-(defn tick-lines [x drop-distances]
-  (into [:g [:text {:x 100 :y 100} "Hi Mum"] [:text {:x 200 :y 200} "Hi Dad"]]
-        (for [drop-distance drop-distances
-              :let [from [x drop-distance]
-                    to [(+ x 6) drop-distance]
+(defn tick-lines [x drop-infos]
+  (log "info: " drop-infos)
+  (into [:g (insert-labels x drop-infos)]
+        (for [drop-info drop-infos
+              :let [drop-distance (:proportional-y drop-info)
                     res [:line
                          (merge line-defaults
-                                {:x1 (first from) :y1 (second from)
-                                 :x2 (first to) :y2 (second to)})]]]
+                                {:x1 x :y1 drop-distance
+                                 :x2 (+ x 6) :y2 drop-distance})]]]
           res)))
 
 ;;
@@ -168,10 +179,6 @@
 ;; Because of the use-case, when we are exactly on it we repeat it. I'm thinking the two values will have the greatest
 ;; or least used. This obviates the question of there being any preference for before or after. Also when user is at
 ;; the first or last point there will still be a result.
-;; Because x comes from the screen and we only ever translate bus -> scr, and we only ever actually see business
-;; values (translation is done as values are rendered), then as we look thru the x values of elements from the
-;; external (i.e. business) line we must translate them to what was/is on the screen, just for the benefit of the
-;; incoming x.
 ;;
 (defn enclosed-by [x line-name]
   (let [points (line-points line-name)

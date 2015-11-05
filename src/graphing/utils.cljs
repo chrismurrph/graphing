@@ -50,14 +50,16 @@
         ]
     rounded-res))
 
-(defn bisect-vertical-between [[x0 y0] [x1 y1] x]
+(defn bisect-vertical-between [[x0 y0 val0] [x1 y1 val1] x]
   (let [x-diff (- x1 x0)
         y-diff (- y1 y0)
-        ratio (/ y-diff x-diff)
+        val-diff (- val1 val0)
+        y-ratio (/ y-diff x-diff)
+        val-ratio (/ val-diff x-diff)
         x-from-start (- x x0)
-        res1 (* x-from-start ratio)
-        res2 (+ y0 res1)]
-    res2))
+        y-res (+ y0 (* x-from-start y-ratio))
+        val-res (+ val0 (* x-from-start val-ratio))]
+    {:proportional-y y-res :proportional-val val-res}))
 
 (defn style [& info]
   {:style (.trim (apply str (map #(let [[kwd val] %]
