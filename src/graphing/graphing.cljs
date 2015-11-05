@@ -85,7 +85,7 @@
            :cy y
            :fill (rgb-map-to-str rgb-map)})])
 
-(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false :labels-visible? false}))
+(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false :labels-visible? false :labels []}))
 (defn my-lines-size [] (count (:my-lines @state)))
 
 (defn controller [inchan]
@@ -166,7 +166,7 @@
                                  _ (log "x: " x)
                                  y-intersect (bisect-vertical-between left-translated right-translated x)]]
                        y-intersect)]
-    (log y-intersects)))
+    (vec y-intersects)))
 
 ;;
 ;; When in sticky time we want mouse movement to be ignored.
@@ -191,7 +191,7 @@
       (if (not currently-sticky)
         (when now-sticking
           (when (not labels-already-showing)
-            (show-labels-fn x)
+            (swap! state assoc-in [:labels] (show-labels-fn x))
             (swap! state assoc-in [:labels-visible?] true)
             (swap! state assoc-in [:in-sticky-time?] true)))
         (when (not now-sticking)
@@ -219,7 +219,7 @@
       [all-points-component my-lines]
       [(plum-line-at height) (not (nil? hover-pos)) hover-pos]
       (when labels-visible?
-        [(tick-lines-over hover-pos) [20 40 60]])
+        [(tick-lines-over hover-pos) (get-in @state [:labels])])
       ]
      [:input {:type "button" :value "Methane"
               :on-click #(line-reader "Methane")}]
@@ -250,6 +250,3 @@
     (go
       (let [exit (<! proc)]
         (prn :exit! exit)))))
-
-
-
