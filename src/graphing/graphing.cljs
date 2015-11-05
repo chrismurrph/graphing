@@ -2,7 +2,7 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async
              :refer [<! >! chan close! put!]]
-            [graphing.graph-lines-db :refer [light-blue black get-external-line enclosed-by]]
+            [graphing.graph-lines-db :refer [light-blue black get-external-line]]
             [graphing.utils :refer [log distance bisect-vertical-between]]
             )
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
@@ -151,20 +151,70 @@
 (defn get-names []
   (map :name (get-in @state [:my-lines])))
 
-(defn show-labels-moment [translator x]
+(defn line-points [name]
+  (let [all-lines (get-in @state [:my-lines])
+        one-line (first (filter #(= (:name %) name) all-lines))
+        ;_ (log "LINE: " one-line)
+        its-points (:points one-line)
+        ;_ (log "POINTS: " its-points)
+        ]
+    its-points))
+
+;;
+;; Any x may have two positions, one on either side, or none. These two positions will be useful to the drop-down
+;; y-line that comes up as the user moves the mouse over the graph.
+;; In the reduce implementation we only know the previous one when we have gone past it, hence we need to keep the
+;; prior in the accumulator.
+;; Because of the use-case, when we are exactly on it we repeat it. I'm thinking the two values will have the greatest
+;; or least used. This obviates the question of there being any preference for before or after. Also when user is at
+;; the first or last point there will still be a result.
+;; Because x comes from the screen and we only ever translate bus -> scr, and we only ever actually see business
+;; values (translation is done as values are rendered), then as we look thru the x values of elements from the
+;; external (i.e. business) line we must translate them to what was/is on the screen, just for the benefit of the
+;; incoming x.
+;;
+(defn enclosed-by [x line-name]
+  (let [points (line-points line-name)
+        ;_ (u/log "positions to reduce over: " positions)
+        res (reduce (fn [acc ele] (if (empty? (:res acc))
+                                    (let [cur-x (first ele)]
+                                      (if (= cur-x x)
+                                        {:res [ele ele]}
+                                        (if (> cur-x x)
+                                          {:res [(:prev acc)] :prev ele} ;use the prior element
+                                          {:res [] :prev ele} ;only update prior element
+                                          )
+                                        )
+                                      )
+                                    (let [result-so-far (:res acc)]
+                                      (if (= 1 (count result-so-far))
+                                        {:res (conj result-so-far (:prev acc))}
+                                        acc)
+                                      )
+                                    ))
+                    []
+                    points)
+        ]
+    (let [result (:res res)]
+      (if (empty? result)
+        nil
+        (if (= 1 (count result))
+          (let [last-ele (last points)]
+            (conj result last-ele))
+          result)))))
+
+(defn show-labels-moment [x]
   (let [names (get-names)
         _ (log "names: " names)
-        surrounding-at (partial enclosed-by (:horizontally translator) x)
-        trans-point-fn (:whole-point translator)
+        surrounding-at (partial enclosed-by x)
+        ;trans-point-fn (:whole-point translator)
         enclosed-by-res (remove nil? (map surrounding-at names))
         _ (log "enclosed result: " enclosed-by-res)
         y-intersects (for [[left-of right-of] enclosed-by-res
-                           :let [left-translated (trans-point-fn left-of)
-                                 right-translated (trans-point-fn right-of)
-                                 _ (log "left: " left-translated)
-                                 _ (log "right: " right-translated)
+                           :let [_ (log "left: " left-of)
+                                 _ (log "right: " right-of)
                                  _ (log "x: " x)
-                                 y-intersect (bisect-vertical-between left-translated right-translated x)]]
+                                 y-intersect (bisect-vertical-between left-of right-of x)]]
                        y-intersect)]
     (vec y-intersects)))
 
@@ -180,7 +230,8 @@
                             false
                             (let [diff (- (seconds current-time) (seconds past-time))]
                               (< 1 diff 4))))
-        show-labels-fn (partial show-labels-moment translator)]
+        ;show-labels-fn (partial show-labels-moment translator)
+        ]
   (fn []
     (let [now (now-time)
           last-time-moved (:last-mouse-moment @state)
@@ -191,7 +242,7 @@
       (if (not currently-sticky)
         (when now-sticking
           (when (not labels-already-showing)
-            (swap! state assoc-in [:labels] (show-labels-fn x))
+            (swap! state assoc-in [:labels] (show-labels-moment x))
             (swap! state assoc-in [:labels-visible?] true)
             (swap! state assoc-in [:in-sticky-time?] true)))
         (when (not now-sticking)

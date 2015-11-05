@@ -81,50 +81,6 @@
         ]
     res))
 
-;;
-;; Any x may have two positions, one on either side, or none. These two positions will be useful to the drop-down
-;; y-line that comes up as the user moves the mouse over the graph.
-;; In the reduce implementation we only know the previous one when we have gone past it, hence we need to keep the
-;; prior in the accumulator.
-;; Because of the use-case, when we are exactly on it we repeat it. I'm thinking the two values will have the greatest
-;; or least used. This obviates the question of there being any preference for before or after. Also when user is at
-;; the first or last point there will still be a result.
-;; Because x comes from the screen and we only ever translate bus -> scr, and we only ever actually see business
-;; values (translation is done as values are rendered), then as we look thru the x values of elements from the
-;; external (i.e. business) line we must translate them to what was/is on the screen, just for the benefit of the
-;; incoming x.
-;;
-(defn enclosed-by [translate-x x line-name]
-  (let [line (get-external-line line-name)
-        positions (:positions line)
-        ;_ (u/log "positions to reduce over: " positions)
-        res (reduce (fn [acc ele] (if (empty? (:res acc))
-                                    (let [cur-x (translate-x (:x ele))]
-                                      (if (= cur-x x)
-                                        {:res [ele ele]}
-                                        (if (> cur-x x)
-                                          {:res [(:prev acc)] :prev ele} ;use the prior element
-                                          {:res [] :prev ele} ;only update prior element
-                                          )
-                                        )
-                                      )
-                                    (let [result-so-far (:res acc)]
-                                      (if (= 1 (count result-so-far))
-                                        {:res (conj result-so-far (:prev acc))}
-                                        acc)
-                                      )
-                                    ))
-                    []
-                    positions)
-        ]
-    (let [result (:res res)]
-      (if (empty? result)
-        nil
-        (if (= 1 (count result))
-          (let [last-ele (last positions)]
-            (conj result last-ele))
-          result)))))
-
 (defn get-names []
   (map :name @lines))
 
