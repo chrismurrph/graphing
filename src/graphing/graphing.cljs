@@ -36,25 +36,43 @@
    :stroke-width 2
    :r 5})
 
-(def segment-defaults
+(def line-defaults
   {:stroke (rgb-map-to-str black)
    :stroke-width 1})
 
-(defn segment [height visible x-position]
+(defn plum-line [height visible x-position]
   (let [from [x-position 0]
         to [x-position height]
         res (when visible [:line
-                           (merge segment-defaults
+                           (merge line-defaults
                                   {:x1 (first from) :y1 (second from)
-                                   :x2 (first to) :y2 (second to)})])
-        ;_ (when res (u/log res))
-        ]
+                                   :x2 (first to) :y2 (second to)})])]
     res))
+
+;;
+;; Many lines coming out from the plum line
+;;
+(defn tick-lines [x drop-distances]
+  (into [:g]
+        (for [drop-distance drop-distances
+              :let [from [x drop-distance]
+                    to [(+ x 10) drop-distance]
+                    res [:line
+                         (merge line-defaults
+                                {:x1 (first from) :y1 (second from)
+                                 :x2 (first to) :y2 (second to)})]]]
+          res)))
 
 ;;
 ;; Need to supply visible and x-position to display it
 ;;
-(defn hover-line-at [height] (partial segment height))
+(defn plum-line-at [height] (partial plum-line height))
+
+;;
+;; At the time that the plum-line is made visible, many of these at the same x will also be
+;; made visible
+;;
+(defn tick-lines-over [x] (partial tick-lines x))
 
 ;;
 ;; Creates a point as a component
@@ -190,6 +208,11 @@
     (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
     (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
+(defn two-lines []
+  (into [:g {:key (gen-key)}]
+  [:line {:stroke "rgb(0,0,0)", :stroke-width 1, :x1 20, :y1 60, :x2 30, :y2 60}]
+  [:line {:stroke "rgb(0,0,0)", :stroke-width 1, :x1 20, :y1 200, :x2 30, :y2 200}] ))
+
 (defn main-component [options-map]
   (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour],
          :or {height 480 width 640}} options-map
@@ -199,8 +222,10 @@
             :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
             :style {:border "thin solid black"}}
       [all-points-component my-lines]
-      [(hover-line-at height) (not (nil? hover-pos)) hover-pos]
-      (when labels-visible? [:text {:x 100 :y 100} "Hi Mum"])]
+      [(plum-line-at height) (not (nil? hover-pos)) hover-pos]
+      (when labels-visible?
+        [(tick-lines-over hover-pos) [20 40 60]])
+      ]
      [:input {:type "button" :value "Methane"
               :on-click #(line-reader "Methane")}]
      [:input {:type "button" :value "Oxygen"

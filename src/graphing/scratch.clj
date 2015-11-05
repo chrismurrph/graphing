@@ -49,7 +49,7 @@
 (defn points-from-lines [my-lines]
   (println my-lines)
   (for [line my-lines
-        :let [_ (println line)
+        :let [;_ (println line)
               colour (:colour line)
               component-fn (partial point-component colour)
               points (:points line)]
@@ -63,7 +63,28 @@
         (points-from-lines my-lines)
         ))
 
+(def black {:r 0 :g 0 :b 0})
+
+(defn rgb-map-to-str [{r :r g :g b :b}]
+  (str "rgb(" r "," g "," b ")"))
+
+(def line-defaults
+  {:stroke (rgb-map-to-str black)
+   :stroke-width 1})
+
+(defn tick-lines [x drop-distances]
+  (into [:g]
+        (for [drop-distance drop-distances
+              :let [from [x drop-distance]
+                    to [(+ x 10) drop-distance]
+                    res [:line
+                         (merge line-defaults
+                                {:x1 (first from) :y1 (second from)
+                                 :x2 (first to) :y2 (second to)})]]]
+          res)))
+
 (defn -main
   [& args]
-  (println (all-points-component input))
+  (println (tick-lines 20 [60 70]))
+  ;(println (all-points-component input))
   )
