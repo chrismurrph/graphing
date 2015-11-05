@@ -117,12 +117,13 @@
                     []
                     positions)
         ]
-    (let [result (:res res)
-          ;_ (u/log "RES: " result)
-          ]
+    (let [result (:res res)]
       (if (empty? result)
         nil
-        result))))
+        (if (= 1 (count result))
+          (let [last-ele (last positions)]
+            (conj result last-ele))
+          result)))))
 
 (defn get-names []
   (map :name @lines))
