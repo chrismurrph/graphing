@@ -53,10 +53,10 @@
 ;; Many lines coming out from the plum line
 ;;
 (defn tick-lines [x drop-distances]
-  (into [:g]
+  (into [:g [:text {:x 100 :y 100} "Hi Mum"] [:text {:x 200 :y 200} "Hi Dad"]]
         (for [drop-distance drop-distances
               :let [from [x drop-distance]
-                    to [(+ x 10) drop-distance]
+                    to [(+ x 6) drop-distance]
                     res [:line
                          (merge line-defaults
                                 {:x1 (first from) :y1 (second from)
@@ -224,14 +224,12 @@
 ;; A further refinement would be for the moving away to make it 'stuck'
 ;; (and clicking would also have to have this effect)
 ;;
-(defn tick [translator]
+(defn tick []
   (let [in-sticky-time? (fn [past-time current-time]
                           (if (or (nil? current-time) (nil? past-time))
                             false
                             (let [diff (- (seconds current-time) (seconds past-time))]
-                              (< 1 diff 4))))
-        ;show-labels-fn (partial show-labels-moment translator)
-        ]
+                              (< 1 diff 4))))]
   (fn []
     (let [now (now-time)
           last-time-moved (:last-mouse-moment @state)
@@ -270,7 +268,8 @@
       [all-points-component my-lines]
       [(plum-line-at height) (not (nil? hover-pos)) hover-pos]
       (when labels-visible?
-        [(tick-lines-over hover-pos) (get-in @state [:labels])])
+        [(tick-lines-over hover-pos) (get-in @state [:labels])]
+        )
       ]
      [:input {:type "button" :value "Methane"
               :on-click #(line-reader "Methane")}]
@@ -294,8 +293,8 @@
   (let [ch (chan)
         proc (controller ch)
         args (into {:comms ch} options-map)
-        tick-with-trans (tick (:translator options-map))
-        _ (js/setInterval #(tick-with-trans) 500)
+        tick-fn (tick)
+        _ (js/setInterval #(tick-fn) 500)
         ]
     (reagent/render-component
       [trending-app args]
