@@ -1,6 +1,7 @@
 (ns graphing.core
   (:require [graphing.graph-lines-db :as db]
-            [graphing.graphing :as g])
+            [graphing.graphing :as g]
+            [graphing.utils :refer [log]])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 ;;

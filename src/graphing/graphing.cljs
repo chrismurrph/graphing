@@ -224,7 +224,8 @@
      [:input {:type "button" :value "Methane"
               :on-click #(line-reader "Methane")}]
      [:input {:type "button" :value "Oxygen"
-              :on-click #(line-reader "Oxygen")}]]))
+              :on-click #(line-reader "Oxygen")}]
+     ]))
 
 (defn trending-app [options-map]
   (let [component (reagent/current-component)
@@ -242,8 +243,9 @@
   (let [ch (chan)
         proc (controller ch)
         args (into {:comms ch} options-map)
-        tick-with-trans (tick (-> options-map :translator))
-        _ (js/setInterval #(tick-with-trans) 500)]
+        tick-with-trans (tick (:translator options-map))
+        _ (js/setInterval #(tick-with-trans) 500)
+        ]
     (reagent/render-component
       [trending-app args]
       (.-body js/document))

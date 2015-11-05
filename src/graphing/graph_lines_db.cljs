@@ -1,4 +1,4 @@
-(ns ^:figwheel-always graphing.graph-lines-db
+(ns graphing.graph-lines-db
   (:require [graphing.utils :as u]))
 
 (def black {:r 0 :g 0 :b 0})

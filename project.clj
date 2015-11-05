@@ -5,12 +5,12 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/clojurescript "1.7.145"]
 		 [reagent "0.5.1"]
-		 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
+		 [org.clojure/core.async "0.2.371"]
 		 [org.clojure/core.match "0.2.1"]
-		 [figwheel "0.3.3"]]
+		 [figwheel "0.4.1"]]
 
   :plugins [[lein-cljsbuild "1.0.6"]
-            [lein-figwheel "0.3.3"]]  
+            [lein-figwheel "0.4.1"]]
 
   :source-paths ["src"]
   
@@ -23,7 +23,6 @@
               :figwheel {:on-jsload "graphing.core/mount-root"}
               :compiler {
                 :main graphing.core
-                ;:preamble ["reagent/react.js"]
                 :output-to "resources/public/js/graphing.js"
                 :output-dir "resources/public/js/out"
                 :asset-path "js/out"

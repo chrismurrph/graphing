@@ -1,5 +1,4 @@
-(ns graphing.utils
-  )
+(ns graphing.utils)
 
 (defn log [& txts]
   (.log js/console (apply str txts)))
