@@ -88,28 +88,28 @@
 (def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false :labels-visible? false}))
 (defn my-lines-size [] (count (:my-lines @state)))
 
-(defn controller [inchan state-ref]
+(defn controller [inchan]
   (go-loop [cur-x nil cur-y nil old-x nil old-y nil]
            (match [(<! inchan)]
 
                   [{:type "mousemove" :x x :y y}]
                   (let [now-moment (now-time)
-                        in-sticky-time? (:in-sticky-time? @state-ref)
+                        in-sticky-time? (:in-sticky-time? @state)
                         diff (distance [old-x old-y] [cur-x cur-y])
                         is-flick (> diff 10)]
                     (when (not is-flick)
                       (when (not in-sticky-time?)
-                        (swap! state-ref assoc-in [:hover-pos] x)
-                        (swap! state-ref assoc-in [:last-mouse-moment] now-moment)
-                        (swap! state-ref assoc-in [:labels-visible?] false)
+                        (swap! state assoc-in [:hover-pos] x)
+                        (swap! state assoc-in [:last-mouse-moment] now-moment)
+                        (swap! state assoc-in [:labels-visible?] false)
                         ;(u/log (get-in @state-ref [:hover-pos]))
                         ))
                     (recur x y cur-x cur-y))
 
                   [{:type "mouseup" :x x :y y}]
                   (let [current-line (dec (my-lines-size))]
-                    (log "Already colour of current line at " current-line " is " (get-in @state-ref [:my-lines current-line :colour]))
-                    (swap! state-ref update-in [:my-lines current-line :points] (fn [points-at-n] (vec (conj points-at-n [x y]))))
+                    (log "Already colour of current line at " current-line " is " (get-in @state [:my-lines current-line :colour]))
+                    (swap! state update-in [:my-lines current-line :points] (fn [points-at-n] (vec (conj points-at-n [x y]))))
                     ;(u/log "When mouse up time is: " when-last-moved)
                     (recur x y old-x old-y))
 
@@ -208,11 +208,6 @@
     (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
     (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
-(defn two-lines []
-  (into [:g {:key (gen-key)}]
-  [:line {:stroke "rgb(0,0,0)", :stroke-width 1, :x1 20, :y1 60, :x2 30, :y2 60}]
-  [:line {:stroke "rgb(0,0,0)", :stroke-width 1, :x1 20, :y1 200, :x2 30, :y2 200}] ))
-
 (defn main-component [options-map]
   (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour],
          :or {height 480 width 640}} options-map
@@ -232,10 +227,9 @@
               :on-click #(line-reader "Oxygen")}]]))
 
 (defn trending-app [options-map]
-  (let [{:keys [state-ref comms]} options-map
-        component (reagent/current-component)
-        handler-fn (partial event-handler-fn comms component)
-        args (into (into {:handler-fn handler-fn} @state-ref) (dissoc options-map :state-ref :comms))]
+  (let [component (reagent/current-component)
+        handler-fn (partial event-handler-fn (:comms options-map) component)
+        args (into (into {:handler-fn handler-fn} @state) (dissoc options-map :state-ref :comms))]
     [main-component args]))
 
 ;;
@@ -245,10 +239,9 @@
 ;; Note that :trans-colour does not exist - colours have to be of shape {:r :g :b}
 ;;
 (defn init [options-map]
-  (let [paths-ratom state
-        ch (chan)
-        proc (controller ch paths-ratom)
-        args (into {:state-ref paths-ratom :comms ch} options-map)
+  (let [ch (chan)
+        proc (controller ch)
+        args (into {:comms ch} options-map)
         tick-with-trans (tick (-> options-map :translator))
         _ (js/setInterval #(tick-with-trans) 500)]
     (reagent/render-component
