@@ -57,8 +57,9 @@
     res))
 
 (defn insert-labels [x drop-infos]
-  (for [drop-info drop-infos]
-    ^{:key (gen-key)}[:text {:x (+ x 10) :y (+ (:proportional-y drop-info) 4) :font-size "0.8em"} (format-as-str (or (:dec-places drop-info) 2) (:proportional-val drop-info))]))
+  (for [drop-info drop-infos
+        :let [y-intersect (:y-intersect drop-info)]]
+    ^{:key (gen-key)}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em"} (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect))]))
 
 ;;
 ;; Many lines coming out from the plum line
@@ -67,7 +68,7 @@
   (log "info: " drop-infos)
   (into [:g (insert-labels x drop-infos)]
         (for [drop-info drop-infos
-              :let [drop-distance (:proportional-y drop-info)
+              :let [drop-distance (:proportional-y (:y-intersect drop-info))
                     res [:line
                          (merge line-defaults
                                 {:x1 x :y1 drop-distance
@@ -207,23 +208,24 @@
         nil
         (if (= 1 (count result))
           (let [last-ele (last points)]
-            (conj result last-ele))
-          result)))))
+            {:name line-name :pair (conj result last-ele)})
+          {:name line-name :pair result})))))
 
 (defn show-labels-moment [x]
   (let [names (get-names)
         _ (log "names: " names)
         surrounding-at (partial enclosed-by x)
         ;trans-point-fn (:whole-point translator)
-        enclosed-by-res (remove nil? (map surrounding-at names))
-        _ (log "enclosed result: " enclosed-by-res)
-        y-intersects (for [[left-of right-of] enclosed-by-res
-                           :let [_ (log "left: " left-of)
-                                 _ (log "right: " right-of)
-                                 _ (log "x: " x)
+        many-enclosed-by-res (remove nil? (map surrounding-at names))
+        _ (log "enclosed result: " many-enclosed-by-res)
+        results (for [[left-of right-of] (map :pair many-enclosed-by-res)
+                           name (map :name many-enclosed-by-res)
+                           :let [_ (log name " left: " left-of)
+                                 _ (log name " right: " right-of)
+                                 _ (log name " x: " x)
                                  y-intersect (bisect-vertical-between left-of right-of x)]]
-                       y-intersect)]
-    (vec y-intersects)))
+                       {:name name :y-intersect y-intersect})]
+    (vec results)))
 
 ;;
 ;; When in sticky time we want mouse movement to be ignored.
