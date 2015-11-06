@@ -1,7 +1,8 @@
 (ns graphing.core
   (:require [graphing.graph-lines-db :as db]
             [graphing.graphing :as g]
-            [graphing.utils :refer [log]])
+            [graphing.utils :refer [log]]
+            [graphing.staging-area :as sa])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 ;;
@@ -29,9 +30,19 @@
 ;;
 (def translate-point (fn [{x :x y :y val :val}] [(horizontally-translate x) (vertically-translate y) val]))
 (def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
+(def line-keys [:name :units :colour :dec-places])
 
 (defn mount-root []
-  (g/init {:height graph-height :width graph-width :translator translator :get-positions get-positions :get-colour get-colour :get-units get-units}))
+  (g/init {:height graph-height :width graph-width :translator translator})
+  (let [res (g/add-line (select-keys sa/first-line line-keys))]
+    (log "ADDED: " res))
+  (doseq [point (get sa/first-line :points)]
+    (g/add-point (assoc {:name "First line"} :point point)))
+  (let [res (g/add-line (select-keys (nth @sa/lines 0) line-keys))]
+    (log "ADDED: " res))
+  (g/add-line (select-keys (nth @sa/lines 1) line-keys))
+
+  )
 
 (defn ^:export run []
     (mount-root))

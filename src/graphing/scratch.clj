@@ -83,8 +83,10 @@
                                  :x2 (first to) :y2 (second to)})]]]
           res)))
 
+(def example-map {"Chris" [[0 0]]})
+
 (defn -main
   [& args]
-  (println (tick-lines 20 [60 70]))
+  ;(println (tick-lines 20 [60 70]))
   ;(println (all-points-component input))
-  )
+  (println (get example-map "Chris")))

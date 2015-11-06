@@ -2,7 +2,7 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async
              :refer [<! >! chan close! put!]]
-            [graphing.graph-lines-db :refer [light-blue black get-external-line]]
+            [graphing.graph-lines-db :refer [light-blue black]]
             [graphing.utils :refer [log distance bisect-vertical-between]]
             [goog.string :as gstring]
             [goog.string.format]
@@ -12,10 +12,10 @@
 
 (def ratom reagent/atom)
 
-(defn rgb-map-to-str [{r :r g :g b :b}]
+(defn- rgb-map-to-str [{r :r g :g b :b}]
   (str "rgb(" r "," g "," b ")"))
 
-(defn format-as-str [dec-pl val units]
+(defn- format-as-str [dec-pl val units]
   (gstring/format (str "%." dec-pl "f" units) val))
 
 ;(def uniqkey (atom 0))
@@ -24,41 +24,35 @@
 ;    ;(u/log res)
 ;    res))
 
-(defn now-time [] (js/Date.))
-(defn seconds [js-date] (.getSeconds js-date))
+(defn- now-time [] (js/Date.))
+(defn- seconds [js-date] (.getSeconds js-date))
 
 ;;
 ;; Currently leaving up forever. Will prolly re-instate use of this later...
 ;;
-(defn still-interested? [past-time current-time]
+(defn- still-interested? [past-time current-time]
   (let [diff (- (seconds current-time) (seconds past-time))]
     (< diff 30)))
 
-;;
-;; [x y real-value]
-;; Note that y is greater as lower but real value will be smaller as lower
-;;
-(def first-line {:name "First line" :colour light-blue :dec-places 3 :units "" :points [[10 10 0.511] [20 20 0.411] [30 30 0.311] [40 40 0.211] [50 50 0.111]]})
-;(def logical-state (atom {:in-sticky-time? false}))
-(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels []}))
+(def state (ratom {:my-lines {} :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels []}))
 
-(defn line [name]
-  (first (filter #(= (:name %) name) (:my-lines @state))))
+(defn- find-line [name]
+  (get (:my-lines @state) name))
 
 (def line-defaults
   {:stroke (rgb-map-to-str black)
    :stroke-width 1})
 
-(defn plum-line [height visible x-position]
+(defn- plum-line [height visible x-position]
   (let [res (when visible [:line
                            (merge line-defaults
                                   {:x1 x-position :y1 0
                                    :x2 x-position :y2 height})])]
     res))
 
-(defn insert-labels [x drop-infos]
+(defn- insert-labels [x drop-infos]
   (for [drop-info drop-infos
-        :let [line-doing (-> drop-info :name line)
+        :let [line-doing (-> drop-info :name find-line)
               colour-str (-> line-doing :colour rgb-map-to-str)
               units-str (:units line-doing)
               y-intersect drop-info]]
@@ -68,11 +62,11 @@
 ;;
 ;; Many lines coming out from the plum line
 ;;
-(defn tick-lines [x visible drop-infos]
+(defn- tick-lines [x visible drop-infos]
   ;(log "info: " drop-infos)
   (when visible (into [:g (doall (insert-labels x drop-infos))]
                       (for [drop-info drop-infos
-                            :let [line-doing (-> drop-info :name line)
+                            :let [line-doing (-> drop-info :name find-line)
                                   colour-str (-> line-doing :colour rgb-map-to-str)
                                   _ (log (:name drop-info) " going to be " colour-str)
                                   drop-distance (:proportional-y drop-info)
@@ -86,13 +80,13 @@
 ;;
 ;; Need to supply visible and x-position to display it
 ;;
-(defn plum-line-at [height] (partial plum-line height))
+(defn- plum-line-at [height] (partial plum-line height))
 
 ;;
 ;; At the time that the plum-line is made visible, many of these at the same x will also be
 ;; made visible
 ;;
-(defn tick-lines-over [x] (partial tick-lines x))
+(defn- tick-lines-over [x] (partial tick-lines x))
 
 (def point-defaults
   {:stroke (rgb-map-to-str black)
@@ -102,7 +96,7 @@
 ;;
 ;; Creates a point as a component
 ;;
-(defn point [rgb-map x y]
+(defn- point [rgb-map x y]
   (log rgb-map)
   [:circle
    (merge point-defaults
@@ -110,9 +104,10 @@
            :cy y
            :fill (rgb-map-to-str rgb-map)})])
 
-(defn my-lines-size [] (count (:my-lines @state)))
+; Now it is a map where the key is a line name
+;(defn- my-lines-size [] (count (:my-lines @state)))
 
-(defn controller [inchan]
+(defn- controller [inchan]
   (go-loop [cur-x nil cur-y nil old-x nil old-y nil]
            (match [(<! inchan)]
 
@@ -130,38 +125,44 @@
                         ))
                     (recur x y cur-x cur-y))
 
-                  [{:type "mouseup" :x x :y y}]
-                  (let [current-line (dec (my-lines-size))]
-                    (log "Already colour of current line at " current-line " is " (get-in @state [:my-lines current-line :colour]))
-                    (swap! state update-in [:my-lines current-line :points] (fn [points-at-n] (vec (conj points-at-n [x y]))))
-                    ;(u/log "When mouse up time is: " when-last-moved)
-                    (recur x y old-x old-y))
+                  ;[{:type "mouseup" :x x :y y}]
+                  ;(let [current-line (dec (my-lines-size))]
+                  ;  (log "Already colour of current line at " current-line " is " (get-in @state [:my-lines current-line :colour]))
+                  ;  (swap! state update-in [:my-lines current-line :points] (fn [points-at-n] (vec (conj points-at-n [x y]))))
+                  ;  ;(u/log "When mouse up time is: " when-last-moved)
+                  ;  (recur x y old-x old-y))
 
                   [_]
                   (do
                     (recur cur-x cur-y old-x old-y)))))
 
-(defn event-handler-fn [comms component e]
+(defn- event-handler-fn [comms component e]
   (let [bounds (. (reagent/dom-node component) getBoundingClientRect)
         y (- (.-clientY e) (.-top bounds))
         x (- (.-clientX e) (.-left bounds))]
     (put! comms {:type (.-type e) :x x :y y})
     nil))
 
-(defn point-component [rgb-map [x y]]
+(defn- point-component [rgb-map [x y]]
   ^{:key [x y]} [point rgb-map x y])
 
-(defn points-from-lines [my-lines]
-  (for [line my-lines
-        :let [colour (:colour line)
-              _ (log "Colour of " (:name line) " is " colour)
+;;
+;; The list comprehension changes hash-map into vector
+;;
+(defn- points-from-lines [my-lines]
+  (log "ALL: " my-lines)
+  (for [line-vec my-lines
+        :let [_ (log "LINE: " line-vec)
+              line-val (second line-vec)
+              colour (:colour line-val)
+              _ (log "Colour of " (:name line-val) " is " colour)
               component-fn (partial point-component colour)
-              points (:points line)]
+              points (:points line-val)]
         point points
         :let [component (component-fn point)]]
     component))
 
-(defn all-points-component [my-lines]
+(defn- all-points-component [my-lines]
   (into [:g {:key my-lines}]
         ;(map #(point-component nil %) (mapcat identity my-lines))
         (points-from-lines my-lines)
@@ -172,10 +173,10 @@
 ;    false
 ;    (still-interested? last-mouse-moment now-moment)))
 
-(defn get-names []
+(defn- get-names []
   (map :name (get-in @state [:my-lines])))
 
-(defn line-points [name]
+(defn- line-points [name]
   (let [all-lines (get-in @state [:my-lines])
         one-line (first (filter #(= (:name %) name) all-lines))
         ;_ (log "LINE: " one-line)
@@ -193,7 +194,7 @@
 ;; or least used. This obviates the question of there being any preference for before or after. Also when user is at
 ;; the first or last point there will still be a result.
 ;;
-(defn enclosed-by [x line-name]
+(defn- enclosed-by [x line-name]
   (let [points (line-points line-name)
         ;_ (u/log "positions to reduce over: " positions)
         res (reduce (fn [acc ele] (if (empty? (:res acc))
@@ -223,7 +224,7 @@
             {:name line-name :pair (conj result last-ele)})
           {:name line-name :pair result})))))
 
-(defn show-labels-moment [x]
+(defn- show-labels-moment [x]
   (let [names (get-names)
         _ (log "names: " names)
         surrounding-at (partial enclosed-by x)
@@ -245,7 +246,7 @@
 ;; A further refinement would be for the moving away to make it 'stuck'
 ;; (and clicking would also have to have this effect)
 ;;
-(defn tick []
+(defn- tick []
   (let [in-sticky-time? (fn [past-time current-time]
                           (if (or (nil? current-time) (nil? past-time))
                             false
@@ -267,7 +268,7 @@
         (when (not now-sticking)
           (swap! state assoc-in [:in-sticky-time?] false)))))))
 
-(defn read-in-external-line [mappify-point-fn get-positions get-colour get-units name]
+(defn- read-in-external-line [mappify-point-fn get-positions get-colour get-units name]
   (log name)
   (let [line (get-external-line name)
         colour (get-colour line)
@@ -279,7 +280,33 @@
     (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
     (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
-(defn main-component [options-map]
+;;
+;; Now a hash-map by name
+;;
+(defn add-line [options-map]
+  "All keys are: :name :units :colour :dec-places. :name is mandatory and must not already exist"
+  (let [{:keys [name units colour dec-places],
+         :or {units "" colour black dec-places 2}} options-map]
+    (assert name "Every line must have a name")
+    (assert (not (clojure.string/blank? name)) "Line name s/not be blank")
+    (assert (nil? (find-line name)) (str "Already have a line called " name))
+    (assert (nil? (get :points options-map)))
+    (let [new-line (into {:points []} options-map)]
+      (swap! state update-in [:my-lines]
+             (fn [existing-lines]
+               (conj existing-lines (hash-map name new-line)))))))
+
+(defn add-point [point-map]
+  (let [name (:name point-map)]
+    (assert (not (clojure.string/blank? name)) "Point trying to add must belong to a line, so need to supply a name")
+    (let [found-line (find-line name)]
+      (assert found-line (str "Line must already exist for the point to be added to it. Could not find line with name: " name))
+      (swap! state update-in [:my-lines name :points]
+             (fn [existing-points]
+               (log "line to update: " existing-points " with " (:point point-map))
+               (conj existing-points (:point point-map)))))))
+
+(defn- main-component [options-map]
   (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour get-units],
          :or {height 480 width 640}} options-map
         line-reader (partial read-in-external-line (:whole-point translator) get-positions get-colour get-units)]
@@ -296,10 +323,13 @@
      [:input {:type "button" :value "Oxygen"
               :on-click #(line-reader "Oxygen")}]
      [:input {:type "button" :value "line called"
-              :on-click #(log (line "Oxygen"))}]
+              :on-click #(log (find-line "Oxygen"))}]
      ]))
 
-(defn trending-app [options-map]
+;;
+;; args is given everything from state, completely unnecessary
+;;
+(defn- trending-app [options-map]
   (let [component (reagent/current-component)
         handler-fn (partial event-handler-fn (:comms options-map) component)
         args (into (into {:handler-fn handler-fn} @state) (dissoc options-map :state-ref :comms))]
