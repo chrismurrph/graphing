@@ -12,23 +12,17 @@
 
 (def ratom reagent/atom)
 
-;;
-;; [x y real-value]
-;; Note that y is greater as lower but real value will be smaller as lower
-;;
-(def first-line {:name "First line" :colour light-blue :dec-places 3 :units "" :points [[10 10 0.511] [20 20 0.411] [30 30 0.311] [40 40 0.211] [50 50 0.111]]})
-
 (defn rgb-map-to-str [{r :r g :g b :b}]
   (str "rgb(" r "," g "," b ")"))
 
 (defn format-as-str [dec-pl val]
   (gstring/format (str "%." dec-pl "f") val))
 
-(def uniqkey (atom 0))
-(defn gen-key []
-  (let [res (swap! uniqkey inc)]
-    ;(u/log res)
-    res))
+;(def uniqkey (atom 0))
+;(defn gen-key []
+;  (let [res (swap! uniqkey inc)]
+;    ;(u/log res)
+;    res))
 
 (defn now-time [] (js/Date.))
 (defn seconds [js-date] (.getSeconds js-date))
@@ -40,10 +34,15 @@
   (let [diff (- (seconds current-time) (seconds past-time))]
     (< diff 30)))
 
-(def point-defaults
-  {:stroke (rgb-map-to-str black)
-   :stroke-width 2
-   :r 5})
+;;
+;; [x y real-value]
+;; Note that y is greater as lower but real value will be smaller as lower
+;;
+(def first-line {:name "First line" :colour light-blue :dec-places 3 :units "" :points [[10 10 0.511] [20 20 0.411] [30 30 0.311] [40 40 0.211] [50 50 0.111]]})
+(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false :labels-visible? false :labels []}))
+
+(defn line [name]
+  (first (filter #(= (:name %) name) (:my-lines @state))))
 
 (def line-defaults
   {:stroke (rgb-map-to-str black)
@@ -59,7 +58,7 @@
 (defn insert-labels [x drop-infos]
   (for [drop-info drop-infos
         :let [y-intersect drop-info]]
-    ^{:key (gen-key)}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em"} (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect))]))
+    ^{:key y-intersect}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em"} (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect))]))
 
 ;;
 ;; Many lines coming out from the plum line
@@ -68,11 +67,14 @@
   ;(log "info: " drop-infos)
   (when visible (into [:g (insert-labels x drop-infos)]
                       (for [drop-info drop-infos
-                            :let [drop-distance (:proportional-y drop-info)
+                            :let [colour-str (-> drop-info :name line :colour rgb-map-to-str)
+                                  _ (log (:name drop-info) " going to be " colour-str)
+                                  drop-distance (:proportional-y drop-info)
                                   res [:line
                                        (merge line-defaults
                                               {:x1 x :y1 drop-distance
-                                               :x2 (+ x 6) :y2 drop-distance})]]]
+                                               :x2 (+ x 6) :y2 drop-distance
+                                               :stroke colour-str})]]]
                         res))))
 
 ;;
@@ -86,6 +88,11 @@
 ;;
 (defn tick-lines-over [x] (partial tick-lines x))
 
+(def point-defaults
+  {:stroke (rgb-map-to-str black)
+   :stroke-width 2
+   :r 5})
+
 ;;
 ;; Creates a point as a component
 ;;
@@ -97,7 +104,6 @@
            :cy y
            :fill (rgb-map-to-str rgb-map)})])
 
-(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false :labels-visible? false :labels []}))
 (defn my-lines-size [] (count (:my-lines @state)))
 
 (defn controller [inchan]
@@ -137,7 +143,7 @@
     nil))
 
 (defn point-component [rgb-map [x y]]
-  ^{:key (gen-key)} [point rgb-map x y])
+  ^{:key [x y]} [point rgb-map x y])
 
 (defn points-from-lines [my-lines]
   (for [line my-lines
@@ -150,7 +156,7 @@
     component))
 
 (defn all-points-component [my-lines]
-  (into [:g {:key (gen-key)}]
+  (into [:g {:key my-lines}]
         ;(map #(point-component nil %) (mapcat identity my-lines))
         (points-from-lines my-lines)
         ))
@@ -218,11 +224,11 @@
         ;trans-point-fn (:whole-point translator)
         many-enclosed-by-res (remove nil? (map surrounding-at names))
         _ (log "enclosed result: " many-enclosed-by-res)
-        results (for [[left-of right-of] (map :pair many-enclosed-by-res)
-                           name (map :name many-enclosed-by-res)
-                           :let [_ (log name " left: " left-of)
-                                 _ (log name " right: " right-of)
-                                 _ (log name " x: " x)
+        results (for [enclosed-by-res many-enclosed-by-res
+                           :let [{name :name pair :pair} enclosed-by-res
+                                 left-of (first pair)
+                                 right-of (second pair)
+                                 _ (log name " left, right, x " left-of " " right-of " " x)
                                  y-intersect (bisect-vertical-between left-of right-of x)]]
                        (into {:name name} y-intersect)
                        )]
@@ -283,6 +289,8 @@
               :on-click #(line-reader "Methane")}]
      [:input {:type "button" :value "Oxygen"
               :on-click #(line-reader "Oxygen")}]
+     [:input {:type "button" :value "line called"
+              :on-click #(log (line "Oxygen"))}]
      ]))
 
 (defn trending-app [options-map]
