@@ -58,22 +58,22 @@
 
 (defn insert-labels [x drop-infos]
   (for [drop-info drop-infos
-        :let [y-intersect (:y-intersect drop-info)]]
+        :let [y-intersect drop-info]]
     ^{:key (gen-key)}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em"} (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect))]))
 
 ;;
 ;; Many lines coming out from the plum line
 ;;
-(defn tick-lines [x drop-infos]
-  (log "info: " drop-infos)
-  (into [:g (insert-labels x drop-infos)]
-        (for [drop-info drop-infos
-              :let [drop-distance (:proportional-y (:y-intersect drop-info))
-                    res [:line
-                         (merge line-defaults
-                                {:x1 x :y1 drop-distance
-                                 :x2 (+ x 6) :y2 drop-distance})]]]
-          res)))
+(defn tick-lines [x visible drop-infos]
+  ;(log "info: " drop-infos)
+  (when visible (into [:g (insert-labels x drop-infos)]
+                      (for [drop-info drop-infos
+                            :let [drop-distance (:proportional-y drop-info)
+                                  res [:line
+                                       (merge line-defaults
+                                              {:x1 x :y1 drop-distance
+                                               :x2 (+ x 6) :y2 drop-distance})]]]
+                        res))))
 
 ;;
 ;; Need to supply visible and x-position to display it
@@ -224,7 +224,8 @@
                                  _ (log name " right: " right-of)
                                  _ (log name " x: " x)
                                  y-intersect (bisect-vertical-between left-of right-of x)]]
-                       {:name name :y-intersect y-intersect})]
+                       (into {:name name} y-intersect)
+                       )]
     (vec results)))
 
 ;;
@@ -269,16 +270,14 @@
 (defn main-component [options-map]
   (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour],
          :or {height 480 width 640}} options-map
-        line-reader (partial read-in-external-line (-> translator :whole-point) get-positions get-colour)]
+        line-reader (partial read-in-external-line (:whole-point translator) get-positions get-colour)]
     [:div
      [:svg {:height height :width width
             :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
             :style {:border "thin solid black"}}
       [all-points-component my-lines]
       [(plum-line-at height) (not (nil? hover-pos)) hover-pos]
-      (when labels-visible?
-        [(tick-lines-over hover-pos) (get-in @state [:labels])]
-        )
+      [(tick-lines-over hover-pos) labels-visible? (get-in @state [:labels])]
       ]
      [:input {:type "button" :value "Methane"
               :on-click #(line-reader "Methane")}]
