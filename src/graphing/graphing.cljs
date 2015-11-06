@@ -39,7 +39,8 @@
 ;; Note that y is greater as lower but real value will be smaller as lower
 ;;
 (def first-line {:name "First line" :colour light-blue :dec-places 3 :units "" :points [[10 10 0.511] [20 20 0.411] [30 30 0.311] [40 40 0.211] [50 50 0.111]]})
-(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :in-sticky-time? false :labels-visible? false :labels []}))
+;(def logical-state (atom {:in-sticky-time? false}))
+(def state (ratom {:my-lines [first-line] :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels []}))
 
 (defn line [name]
   (first (filter #(= (:name %) name) (:my-lines @state))))
@@ -57,15 +58,16 @@
 
 (defn insert-labels [x drop-infos]
   (for [drop-info drop-infos
-        :let [y-intersect drop-info]]
-    ^{:key y-intersect}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em"} (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect))]))
+        :let [colour-str (-> drop-info :name line :colour rgb-map-to-str)
+              y-intersect drop-info]]
+    ^{:key y-intersect}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str} (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect))]))
 
 ;;
 ;; Many lines coming out from the plum line
 ;;
 (defn tick-lines [x visible drop-infos]
   ;(log "info: " drop-infos)
-  (when visible (into [:g (insert-labels x drop-infos)]
+  (when visible (into [:g (doall (insert-labels x drop-infos))]
                       (for [drop-info drop-infos
                             :let [colour-str (-> drop-info :name line :colour rgb-map-to-str)
                                   _ (log (:name drop-info) " going to be " colour-str)
@@ -221,7 +223,6 @@
   (let [names (get-names)
         _ (log "names: " names)
         surrounding-at (partial enclosed-by x)
-        ;trans-point-fn (:whole-point translator)
         many-enclosed-by-res (remove nil? (map surrounding-at names))
         _ (log "enclosed result: " many-enclosed-by-res)
         results (for [enclosed-by-res many-enclosed-by-res
