@@ -15,8 +15,8 @@
 (defn rgb-map-to-str [{r :r g :g b :b}]
   (str "rgb(" r "," g "," b ")"))
 
-(defn format-as-str [dec-pl val]
-  (gstring/format (str "%." dec-pl "f") val))
+(defn format-as-str [dec-pl val units]
+  (gstring/format (str "%." dec-pl "f" units) val))
 
 ;(def uniqkey (atom 0))
 ;(defn gen-key []
@@ -58,9 +58,12 @@
 
 (defn insert-labels [x drop-infos]
   (for [drop-info drop-infos
-        :let [colour-str (-> drop-info :name line :colour rgb-map-to-str)
+        :let [line-doing (-> drop-info :name line)
+              colour-str (-> line-doing :colour rgb-map-to-str)
+              units-str (:units line-doing)
               y-intersect drop-info]]
-    ^{:key y-intersect}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str} (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect))]))
+    ^{:key y-intersect}[:text {:x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str}
+                        (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect) units-str)]))
 
 ;;
 ;; Many lines coming out from the plum line
@@ -69,7 +72,8 @@
   ;(log "info: " drop-infos)
   (when visible (into [:g (doall (insert-labels x drop-infos))]
                       (for [drop-info drop-infos
-                            :let [colour-str (-> drop-info :name line :colour rgb-map-to-str)
+                            :let [line-doing (-> drop-info :name line)
+                                  colour-str (-> line-doing :colour rgb-map-to-str)
                                   _ (log (:name drop-info) " going to be " colour-str)
                                   drop-distance (:proportional-y drop-info)
                                   res [:line
@@ -263,21 +267,22 @@
         (when (not now-sticking)
           (swap! state assoc-in [:in-sticky-time?] false)))))))
 
-(defn read-in-external-line [mappify-point-fn get-positions get-colour name]
+(defn read-in-external-line [mappify-point-fn get-positions get-colour get-units name]
   (log name)
   (let [line (get-external-line name)
         colour (get-colour line)
+        units (get-units line)
         positions (get-positions line)
         mapped-in (mapv mappify-point-fn positions)
         count-existing-lines (count (:my-lines @state))
-        new-line {:name name :points mapped-in :colour colour}]
+        new-line {:name name :points mapped-in :colour colour :units units}]
     (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
     (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
 (defn main-component [options-map]
-  (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour],
+  (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour get-units],
          :or {height 480 width 640}} options-map
-        line-reader (partial read-in-external-line (:whole-point translator) get-positions get-colour)]
+        line-reader (partial read-in-external-line (:whole-point translator) get-positions get-colour get-units)]
     [:div
      [:svg {:height height :width width
             :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn

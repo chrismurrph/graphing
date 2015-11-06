@@ -11,6 +11,7 @@
 ;;
 (def get-positions :positions)
 (def get-colour :colour)
+(def get-units :units)
 (def graph-width 640)
 (def graph-height 250)
 
@@ -30,7 +31,7 @@
 (def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
 
 (defn mount-root []
-  (g/init {:height graph-height :width graph-width :translator translator :get-positions get-positions :get-colour get-colour}))
+  (g/init {:height graph-height :width graph-width :translator translator :get-positions get-positions :get-colour get-colour :get-units get-units}))
 
 (defn ^:export run []
     (mount-root))
