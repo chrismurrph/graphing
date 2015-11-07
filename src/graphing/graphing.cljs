@@ -1,7 +1,7 @@
 (ns graphing.graphing
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async
-             :refer [<! >! chan close! put!]]
+             :refer [<! >! chan close! put! timeout]]
             [graphing.graph-lines-db :refer [light-blue black]]
             [graphing.utils :refer [log distance bisect-vertical-between]]
             [goog.string :as gstring]
@@ -45,10 +45,12 @@
    :stroke-width 1})
 
 (defn- plum-line [height visible x-position]
-  (let [res (when visible [:line
+  (let [currently-sticky (get-in @state [:in-sticky-time?])
+        res (when visible [:line
                            (merge line-defaults
                                   {:x1 x-position :y1 0
-                                   :x2 x-position :y2 height})])]
+                                   :x2 x-position :y2 height
+                                   :stroke-width (if currently-sticky 2 1)})])]
     res))
 
 (defn- insert-labels [x drop-infos]
@@ -269,20 +271,15 @@
         (when (not now-sticking)
           (swap! state assoc-in [:in-sticky-time?] false)))))))
 
-;(defn- read-in-external-line [mappify-point-fn get-positions get-colour get-units name]
-;  (log name)
-;  (let [line (get-external-line name)
-;        colour (get-colour line)
-;        units (get-units line)
-;        positions (get-positions line)
-;        mapped-in (mapv mappify-point-fn positions)
-;        count-existing-lines (count (:my-lines @state))
-;        new-line {:name name :points mapped-in :colour colour :units units}]
-;    (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
-;    (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
+(def tick-timer
+  (let [tick-fn (tick)]
+  (go-loop []
+           (<! (timeout 500))
+           (tick-fn)
+           (recur))))
 
 ;;
-;; Now a hash-map by name
+;; Public API
 ;;
 (defn add-line [options-map]
   "All keys in options-map param are: :name :units :colour :dec-places. :name is mandatory and a line with it must not already exist"
@@ -319,9 +316,9 @@
                (conj existing-points [(translate-horizontally x) (translate-vertically y) val]))))))
 
 (defn- main-component [options-map]
-  (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour get-units],
+  (let [{:keys [handler-fn height width],
          :or {height 480 width 640}} options-map
-        line-reader (partial read-in-external-line (:whole-point translator) get-positions get-colour get-units)]
+        {:keys [my-lines hover-pos labels-visible?]} @state]
     [:div
      [:svg {:height height :width width
             :on-mouse-up handler-fn :on-mouse-down handler-fn :on-mouse-move handler-fn
@@ -331,9 +328,9 @@
       [(tick-lines-over hover-pos) labels-visible? (get-in @state [:labels])]
       ]
      [:input {:type "button" :value "Methane"
-              :on-click #(line-reader "Methane")}]
+              :on-click #(log "Methane")}]
      [:input {:type "button" :value "Oxygen"
-              :on-click #(line-reader "Oxygen")}]
+              :on-click #(log "Oxygen")}]
      [:input {:type "button" :value "line called"
               :on-click #(log (find-line "Oxygen"))}]
      ]))
@@ -344,7 +341,7 @@
 (defn- trending-app [options-map]
   (let [component (reagent/current-component)
         handler-fn (partial event-handler-fn (:comms options-map) component)
-        args (into (into {:handler-fn handler-fn} @state) (dissoc options-map :state-ref :comms))]
+        args (into {:handler-fn handler-fn} (dissoc options-map :comms))]
     [main-component args]))
 
 ;;
@@ -357,8 +354,6 @@
   (let [ch (chan)
         proc (controller ch)
         args (into {:comms ch} options-map)
-        tick-fn (tick)
-        _ (js/setInterval #(tick-fn) 500)
         ]
     (swap! other-state assoc-in [:translator] (:translator options-map))
     (reagent/render-component

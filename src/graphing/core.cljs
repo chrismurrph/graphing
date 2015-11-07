@@ -2,7 +2,8 @@
   (:require [graphing.graph-lines-db :as db]
             [graphing.graphing :as g]
             [graphing.utils :refer [log]]
-            [graphing.staging-area :as sa])
+            [graphing.staging-area :as sa]
+            [graphing.incoming])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 ;;
@@ -38,21 +39,28 @@
         res (g/add-line (select-keys sa/first-line line-keys))]
     (log "ADDED: " res)
     (doseq [point (get sa/first-line :points)]
-      (g/add-point-by-sa (assoc {:name name} :point point))))
+      (g/add-point-by-sa {:name name :point point})))
 
   (let [first (nth @sa/lines 0)
         second (nth @sa/lines 1)
-        first-line (g/add-line (select-keys first line-keys))
-        _ (g/add-line (select-keys second line-keys))
+        ;first-line (g/add-line (select-keys first line-keys))
+        ;_ (g/add-line (select-keys second line-keys))
         to-vec (fn [{x :x y :y val :val}] [x y val])
+        points (for [line @sa/lines
+                     :let [_ (g/add-line (select-keys line line-keys))
+                           positions (:positions line)]
+                     point positions
+                     :let [sumfin (g/add-point-by-sa (assoc {:name (:name line)} :point (to-vec point)))]]
+                 sumfin)
+        _ (log "FOR points:" points)
         ]
-    (log "first-line (all state): " first-line)
-    (doseq [point (get first :positions)]
-      (g/add-point-by-sa (assoc {:name (:name first)} :point (to-vec point))))
-    (doseq [point (get second :positions)]
-      (g/add-point-by-sa (assoc {:name (:name second)} :point (to-vec point))))
-    )
-  )
+
+    ;(log "first-line (all state): " first-line)
+    ;(doseq [point (get first :positions)]
+    ;  (g/add-point-by-sa (assoc {:name (:name first)} :point (to-vec point))))
+    ;(doseq [point (get second :positions)]
+    ;  (g/add-point-by-sa (assoc {:name (:name second)} :point (to-vec point))))
+    ))
 
 (defn ^:export run []
     (mount-root))
