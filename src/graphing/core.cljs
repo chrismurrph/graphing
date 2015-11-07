@@ -34,14 +34,24 @@
 
 (defn mount-root []
   (g/init {:height graph-height :width graph-width :translator translator})
-  (let [res (g/add-line (select-keys sa/first-line line-keys))]
-    (log "ADDED: " res))
-  (doseq [point (get sa/first-line :points)]
-    (g/add-point (assoc {:name "First line"} :point point)))
-  (let [res (g/add-line (select-keys (nth @sa/lines 0) line-keys))]
-    (log "ADDED: " res))
-  (g/add-line (select-keys (nth @sa/lines 1) line-keys))
+  (let [name (:name sa/first-line)
+        res (g/add-line (select-keys sa/first-line line-keys))]
+    (log "ADDED: " res)
+    (doseq [point (get sa/first-line :points)]
+      (g/add-point-by-sa (assoc {:name name} :point point))))
 
+  (let [first (nth @sa/lines 0)
+        second (nth @sa/lines 1)
+        first-line (g/add-line (select-keys first line-keys))
+        _ (g/add-line (select-keys second line-keys))
+        to-vec (fn [{x :x y :y val :val}] [x y val])
+        ]
+    (log "first-line (all state): " first-line)
+    (doseq [point (get first :positions)]
+      (g/add-point-by-sa (assoc {:name (:name first)} :point (to-vec point))))
+    (doseq [point (get second :positions)]
+      (g/add-point-by-sa (assoc {:name (:name second)} :point (to-vec point))))
+    )
   )
 
 (defn ^:export run []

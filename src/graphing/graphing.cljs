@@ -35,6 +35,7 @@
     (< diff 30)))
 
 (def state (ratom {:my-lines {} :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels []}))
+(def other-state (atom {:translator nil}))
 
 (defn- find-line [name]
   (get (:my-lines @state) name))
@@ -174,10 +175,10 @@
 ;    (still-interested? last-mouse-moment now-moment)))
 
 (defn- get-names []
-  (map :name (get-in @state [:my-lines])))
+  (keys (get-in @state [:my-lines])))
 
 (defn- line-points [name]
-  (let [all-lines (get-in @state [:my-lines])
+  (let [all-lines (vals (get-in @state [:my-lines]))
         one-line (first (filter #(= (:name %) name) all-lines))
         ;_ (log "LINE: " one-line)
         its-points (:points one-line)
@@ -268,43 +269,54 @@
         (when (not now-sticking)
           (swap! state assoc-in [:in-sticky-time?] false)))))))
 
-(defn- read-in-external-line [mappify-point-fn get-positions get-colour get-units name]
-  (log name)
-  (let [line (get-external-line name)
-        colour (get-colour line)
-        units (get-units line)
-        positions (get-positions line)
-        mapped-in (mapv mappify-point-fn positions)
-        count-existing-lines (count (:my-lines @state))
-        new-line {:name name :points mapped-in :colour colour :units units}]
-    (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
-    (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
+;(defn- read-in-external-line [mappify-point-fn get-positions get-colour get-units name]
+;  (log name)
+;  (let [line (get-external-line name)
+;        colour (get-colour line)
+;        units (get-units line)
+;        positions (get-positions line)
+;        mapped-in (mapv mappify-point-fn positions)
+;        count-existing-lines (count (:my-lines @state))
+;        new-line {:name name :points mapped-in :colour colour :units units}]
+;    (log mapped-in " where are already " count-existing-lines " and new colour: " colour)
+;    (swap! state assoc-in [:my-lines count-existing-lines] new-line)))
 
 ;;
 ;; Now a hash-map by name
 ;;
 (defn add-line [options-map]
-  "All keys are: :name :units :colour :dec-places. :name is mandatory and must not already exist"
+  "All keys in options-map param are: :name :units :colour :dec-places. :name is mandatory and a line with it must not already exist"
   (let [{:keys [name units colour dec-places],
          :or {units "" colour black dec-places 2}} options-map]
     (assert name "Every line must have a name")
     (assert (not (clojure.string/blank? name)) "Line name s/not be blank")
-    (assert (nil? (find-line name)) (str "Already have a line called " name))
-    (assert (nil? (get :points options-map)))
+    (assert (nil? (find-line name)) (str "Already have a line called: " name))
+    (assert (nil? (get :points options-map)) (str "Points have to be added later for: " name))
     (let [new-line (into {:points []} options-map)]
       (swap! state update-in [:my-lines]
              (fn [existing-lines]
                (conj existing-lines (hash-map name new-line)))))))
 
-(defn add-point [point-map]
-  (let [name (:name point-map)]
+;;
+;; Point that is added here should be in co-ordinate system of the staging area. Has to be in vector format:
+;; [x y val]. Intended to be used by the staging area only. The ys come from the top, which users would not expect!
+;; Translation needs to be done to whatever is the interval canvas size here.
+;; As an obvious aside this means that whenever the canvas size here is changed we should apply the translation
+;; again. This will happen when the axes encroach in from the left.
+;; Because this is part of the public API (for staging area anyway) the translator is kept in an atom.
+;;
+(defn add-point-by-sa [point-map]
+  (let [name (:name point-map)
+        [x y val] (:point point-map)
+        translate-horizontally (-> @other-state :translator :horizontally)
+        translate-vertically (-> @other-state :translator :vertically)]
     (assert (not (clojure.string/blank? name)) "Point trying to add must belong to a line, so need to supply a name")
     (let [found-line (find-line name)]
       (assert found-line (str "Line must already exist for the point to be added to it. Could not find line with name: " name))
       (swap! state update-in [:my-lines name :points]
              (fn [existing-points]
                (log "line to update: " existing-points " with " (:point point-map))
-               (conj existing-points (:point point-map)))))))
+               (conj existing-points [(translate-horizontally x) (translate-vertically y) val]))))))
 
 (defn- main-component [options-map]
   (let [{:keys [handler-fn my-lines hover-pos labels-visible? height width translator get-positions get-colour get-units],
@@ -348,6 +360,7 @@
         tick-fn (tick)
         _ (js/setInterval #(tick-fn) 500)
         ]
+    (swap! other-state assoc-in [:translator] (:translator options-map))
     (reagent/render-component
       [trending-app args]
       (.-body js/document))
