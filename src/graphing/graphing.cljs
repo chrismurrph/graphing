@@ -6,7 +6,7 @@
             [graphing.utils :refer [log distance bisect-vertical-between]]
             [goog.string :as gstring]
             [goog.string.format]
-            )
+            [graphing.utils :as u])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [cljs.core.match.macros :refer [match]]))
 
@@ -310,8 +310,8 @@
 (defn add-point-by-sa [point-map]
   (let [name (:name point-map)
         [x y val] (:point point-map)
-        translate-horizontally (-> @other-state :translator :horizontally)
-        translate-vertically (-> @other-state :translator :vertically)]
+        translate-horizontally (-> @other-state :translator :horiz)
+        translate-vertically (-> @other-state :translator :vert)]
     (assert (not (clojure.string/blank? name)) "Point trying to add must belong to a line, so need to supply a name")
     (assert (integer? x) "x must be an integer")
     (assert (integer? y) "y must be an integer")
@@ -324,8 +324,7 @@
                (conj existing-points [(translate-horizontally x) (translate-vertically y) val]))))))
 
 (defn- main-component [options-map]
-  (let [{:keys [handler-fn height width],
-         :or {height 480 width 640}} options-map
+  (let [{:keys [handler-fn height width]} options-map
         {:keys [my-lines hover-pos labels-visible?]} @state]
     [:div
      [:svg {:height height :width width
@@ -352,6 +351,13 @@
         args (into {:handler-fn handler-fn} (dissoc options-map :comms))]
     [main-component args]))
 
+(defn- stageing-translators [min-x min-y max-x max-y graph-width graph-height]
+  (let [horiz-trans-fn (fn [val] (u/scale {:min min-x :max max-x} {:min 0 :max graph-width} val))
+        vert-trans-fn (fn [val] (u/scale {:min min-y :max max-y} {:min 0 :max graph-height} val))
+        trans-point-fn (fn [{x :x y :y val :val}] [(horiz-trans-fn x) (vert-trans-fn y) val])
+        ]
+    {:horiz horiz-trans-fn :vert vert-trans-fn :point trans-point-fn}))
+
 ;;
 ;; keyword options:
 ;; :height :width :trans-point :get-positions :get-colour
@@ -362,9 +368,14 @@
   (let [ch (chan)
         proc (controller ch)
         args (into {:comms ch} options-map)
+        stageing (:stageing options-map)
+        graph-width (:width options-map)
+        graph-height (:height options-map)
+        translators (stageing-translators (or (:min-x stageing) 0) (or (:min-y stageing) 0) (or (:max-x stageing) 999) (or (:max-y stageing) 999) graph-width graph-height)
         ]
     (reset! state default-state)
-    (swap! other-state assoc-in [:translator] (:translator options-map))
+    ;(log "TRANS: " translators)
+    (swap! other-state assoc-in [:translator] translators)
     (reagent/render-component
       [trending-app args]
       (.-body js/document))

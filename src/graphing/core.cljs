@@ -20,8 +20,8 @@
 ;;
 ;; Translation is always business to screen, not the other way round
 ;;
-(def horizontally-translate (db/scale-fn graph-width))
-(def vertically-translate (db/scale-fn graph-height))
+;(def horizontally-translate (db/scale-fn graph-width))
+;(def vertically-translate (db/scale-fn graph-height))
 
 ;;
 ;; The x and y coming in here are in 'our' co-ordinate system (i.e. not the graph's one). The scale function already
@@ -29,8 +29,8 @@
 ;; how to scale across from one system to another, going TO the graph's geometry. Our geometry happens to be 0-999
 ;; for both x and y. You can only see that if you look at the source of db.
 ;;
-(def translate-point (fn [{x :x y :y val :val}] [(horizontally-translate x) (vertically-translate y) val]))
-(def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
+;(def translate-point (fn [{x :x y :y val :val}] [(horizontally-translate x) (vertically-translate y) val]))
+;(def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
 (def line-keys [:name :units :colour :dec-places])
 
 (defn insert-all-lines []
@@ -44,7 +44,7 @@
         (g/add-point-by-sa {:name line-name :point [(:x position) (:y position) (:val position)]})))))
 
 (defn mount-root []
-  (g/init {:height graph-height :width graph-width :translator translator})
+  (g/init {:height graph-height :width graph-width})
   (insert-all-lines)
   (insert-all-points))
 
