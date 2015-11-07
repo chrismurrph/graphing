@@ -9,7 +9,10 @@
 (defn already-gone [already-sent name x]
   (some #{{:line-name name :x x}} already-sent))
 
-(def tick-timer
+;;
+;; Temporarily make it a definition so it never gets called!
+;;
+(defn tick-timer []
   (go-loop [already-sent []]
     (<! (timeout 1000))
     ;(log "In timer")

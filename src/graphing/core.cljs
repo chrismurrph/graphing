@@ -33,10 +33,20 @@
 (def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
 (def line-keys [:name :units :colour :dec-places])
 
-(defn mount-root []
-  (g/init {:height graph-height :width graph-width :translator translator})
+(defn insert-all-lines []
   (doseq [line @db/lines]
     (g/add-line (select-keys line line-keys))))
+
+(defn insert-all-points []
+  (doseq [line @db/lines]
+    (let [line-name (:name line)]
+      (doseq [position (:positions line)]
+        (g/add-point-by-sa {:name line-name :point [(:x position) (:y position) (:val position)]})))))
+
+(defn mount-root []
+  (g/init {:height graph-height :width graph-width :translator translator})
+  (insert-all-lines)
+  (insert-all-points))
 
 (defn ^:export run []
     (mount-root))

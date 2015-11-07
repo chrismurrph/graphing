@@ -34,8 +34,10 @@
   (let [diff (- (seconds current-time) (seconds past-time))]
     (< diff 30)))
 
-(def state (ratom {:my-lines {} :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels []}))
-(def other-state (atom {:translator nil}))
+(def default-state {:my-lines {} :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels []})
+(def state (ratom default-state))
+(def default-other-state {:translator nil})
+(def other-state (atom default-other-state))
 
 (defn- find-line [name]
   (get (:my-lines @state) name))
@@ -71,7 +73,7 @@
                       (for [drop-info drop-infos
                             :let [line-doing (-> drop-info :name find-line)
                                   colour-str (-> line-doing :colour rgb-map-to-str)
-                                  _ (log (:name drop-info) " going to be " colour-str)
+                                  ;_ (log (:name drop-info) " going to be " colour-str)
                                   drop-distance (:proportional-y drop-info)
                                   res [:line
                                        (merge line-defaults
@@ -100,7 +102,7 @@
 ;; Creates a point as a component
 ;;
 (defn- point [rgb-map x y]
-  (log rgb-map)
+  ;(log rgb-map)
   [:circle
    (merge point-defaults
           {:cx x
@@ -153,12 +155,12 @@
 ;; The list comprehension changes hash-map into vector
 ;;
 (defn- points-from-lines [my-lines]
-  (log "ALL: " my-lines)
+  ;(log "ALL: " my-lines)
   (for [line-vec my-lines
-        :let [_ (log "LINE: " line-vec)
+        :let [;_ (log "LINE: " line-vec)
               line-val (second line-vec)
               colour (:colour line-val)
-              _ (log "Colour of " (:name line-val) " is " colour)
+              ;_ (log "Colour of " (:name line-val) " is " colour)
               component-fn (partial point-component colour)
               points (:points line-val)]
         point points
@@ -220,12 +222,15 @@
                     points)
         ]
     (let [result (:res res)]
-      (if (empty? result)
+      ;(log "RES: " result)
+      (if (nil? (first result)) ;when are before first element
         nil
-        (if (= 1 (count result))
-          (let [last-ele (last points)]
-            {:name line-name :pair (conj result last-ele)})
-          {:name line-name :pair result})))))
+        (if (empty? result)
+          nil
+          (if (= 1 (count result))
+            (let [last-ele (last points)]
+              {:name line-name :pair (conj result last-ele)})
+            {:name line-name :pair result}))))))
 
 (defn- show-labels-moment [x]
   (let [names (get-names)
@@ -308,11 +313,14 @@
         translate-horizontally (-> @other-state :translator :horizontally)
         translate-vertically (-> @other-state :translator :vertically)]
     (assert (not (clojure.string/blank? name)) "Point trying to add must belong to a line, so need to supply a name")
+    (assert (integer? x) "x must be an integer")
+    (assert (integer? y) "y must be an integer")
+    (assert (number? val) "val must be a number")
     (let [found-line (find-line name)]
       (assert found-line (str "Line must already exist for the point to be added to it. Could not find line with name: " name))
       (swap! state update-in [:my-lines name :points]
              (fn [existing-points]
-               (log "line to update: " existing-points " with " (:point point-map))
+               ;(log "line to update: " existing-points " with " (:point point-map))
                (conj existing-points [(translate-horizontally x) (translate-vertically y) val]))))))
 
 (defn- main-component [options-map]
@@ -355,6 +363,7 @@
         proc (controller ch)
         args (into {:comms ch} options-map)
         ]
+    (reset! state default-state)
     (swap! other-state assoc-in [:translator] (:translator options-map))
     (reagent/render-component
       [trending-app args]
