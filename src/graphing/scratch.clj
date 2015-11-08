@@ -85,8 +85,15 @@
 
 (def example-map {"Chris" [[0 0]]})
 
+(def some-points (into (sorted-map) [[23 [1 2]] [17 [3 4]]]))
+
 (defn -main
   [& args]
   ;(println (tick-lines 20 [60 70]))
   ;(println (all-points-component input))
-  (println (get example-map "Chris")))
+  (println some-points)
+  (println (conj some-points [13 [5 6]]))
+  (let [points (for [point some-points]
+                 point)]
+    (println points))
+  )

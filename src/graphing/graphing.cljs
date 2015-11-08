@@ -148,7 +148,7 @@
     (put! comms {:type (.-type e) :x x :y y})
     nil))
 
-(defn- point-component [rgb-map [x y]]
+(defn- point-component [rgb-map [x y _]]
   ^{:key [x y]} [point rgb-map x y])
 
 ;;
@@ -206,7 +206,7 @@
         translate-horizontally (-> @other-state :translator :horiz)
         ;_ (u/log "positions to reduce over: " positions)
         res (reduce (fn [acc ele] (if (empty? (:res acc))
-                                    (let [cur-x (translate-horizontally (first ele))]
+                                    (let [cur-x (translate-horizontally (key ele))]
                                       (if (= cur-x x)
                                         {:res [ele ele]}
                                         (if (> cur-x x)
@@ -297,8 +297,8 @@
     (assert name "Every line must have a name")
     (assert (not (clojure.string/blank? name)) "Line name s/not be blank")
     (assert (nil? (find-line name)) (str "Already have a line called: " name))
-    (assert (nil? (get :points options-map)) (str "Points have to be added later for: " name))
-    (let [new-line (into {:points []} options-map)]
+    (assert (nil? (get :points options-map)) (str "Points have to be added later (i.e. not now!) for: " name))
+    (let [new-line (into {:points (sorted-map)} options-map)]
       (swap! state update-in [:my-lines]
              (fn [existing-lines]
                (conj existing-lines (hash-map name new-line)))))))
@@ -325,8 +325,8 @@
       (assert found-line (str "Line must already exist for the point to be added to it. Could not find line with name: " name))
       (swap! state update-in [:my-lines name :points]
              (fn [existing-points]
-               ;(log "line to update: " existing-points " with " (:point point-map))
-               (conj existing-points [x y val]))))))
+               ; This pair we are conj-ing in will become a MapEntry in the sorted-map that is `:points`
+               (conj existing-points [x [y val]]))))))
 
 (defn- main-component [options-map]
   (let [{:keys [handler-fn height width]} options-map
@@ -359,7 +359,7 @@
 (defn- stageing-translators [min-x min-y max-x max-y graph-width graph-height]
   (let [horiz-trans-fn (fn [val] (u/scale {:min min-x :max max-x} {:min 0 :max graph-width} val))
         vert-trans-fn (fn [val] (u/scale {:min min-y :max max-y} {:min 0 :max graph-height} val))
-        trans-point-fn (fn [[x y val]] [(horiz-trans-fn x) (vert-trans-fn y) val])
+        trans-point-fn (fn [[x [y val]]] [(horiz-trans-fn x) (vert-trans-fn y) val])
         ]
     {:horiz horiz-trans-fn :vert vert-trans-fn :point trans-point-fn}))
 
