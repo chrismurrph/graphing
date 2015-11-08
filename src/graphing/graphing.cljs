@@ -152,20 +152,22 @@
   ^{:key [x y]} [point rgb-map x y])
 
 ;;
-;; The list comprehension changes hash-map into vector
+;; The list comprehension changes hash-map into vector. (Surprised me).
+;;
 ;;
 (defn- points-from-lines [my-lines]
   ;(log "ALL: " my-lines)
-  (for [line-vec my-lines
-        :let [;_ (log "LINE: " line-vec)
-              line-val (second line-vec)
-              colour (:colour line-val)
-              ;_ (log "Colour of " (:name line-val) " is " colour)
-              component-fn (partial point-component colour)
-              points (:points line-val)]
-        point points
-        :let [component (component-fn point)]]
-    component))
+  (let [translate-point (-> @other-state :translator :point)]
+    (for [line-vec my-lines
+          :let [;_ (log "LINE: " line-vec)
+                line-val (second line-vec)
+                colour (:colour line-val)
+                ;_ (log "Colour of " (:name line-val) " is " colour)
+                component-fn (partial point-component colour)
+                points (:points line-val)]
+          point points
+          :let [component (component-fn (translate-point point))]]
+      component)))
 
 (defn- all-points-component [my-lines]
   (into [:g {:key my-lines}]
@@ -201,9 +203,10 @@
 ;;
 (defn- enclosed-by [x line-name]
   (let [points (line-points line-name)
+        translate-horizontally (-> @other-state :translator :horiz)
         ;_ (u/log "positions to reduce over: " positions)
         res (reduce (fn [acc ele] (if (empty? (:res acc))
-                                    (let [cur-x (first ele)]
+                                    (let [cur-x (translate-horizontally (first ele))]
                                       (if (= cur-x x)
                                         {:res [ele ele]}
                                         (if (> cur-x x)
@@ -234,16 +237,17 @@
 
 (defn- show-labels-moment [x]
   (let [names (get-names)
-        _ (log "names: " names)
+        ;_ (log "names: " names)
         surrounding-at (partial enclosed-by x)
         many-enclosed-by-res (remove nil? (map surrounding-at names))
-        _ (log "enclosed result: " many-enclosed-by-res)
+        ;_ (log "enclosed result: " many-enclosed-by-res)
+        translate-point (-> @other-state :translator :point)
         results (for [enclosed-by-res many-enclosed-by-res
                            :let [{name :name pair :pair} enclosed-by-res
                                  left-of (first pair)
                                  right-of (second pair)
-                                 _ (log name " left, right, x " left-of " " right-of " " x)
-                                 y-intersect (bisect-vertical-between left-of right-of x)]]
+                                 ;_ (log name " left, right, x " left-of " " right-of " " x)
+                                 y-intersect (bisect-vertical-between (translate-point left-of) (translate-point right-of) x)]]
                        (into {:name name} y-intersect)
                        )]
     (vec results)))
@@ -310,8 +314,9 @@
 (defn add-point-by-sa [point-map]
   (let [name (:name point-map)
         [x y val] (:point point-map)
-        translate-horizontally (-> @other-state :translator :horiz)
-        translate-vertically (-> @other-state :translator :vert)]
+        ;translate-horizontally (-> @other-state :translator :horiz)
+        ;translate-vertically (-> @other-state :translator :vert)
+        ]
     (assert (not (clojure.string/blank? name)) "Point trying to add must belong to a line, so need to supply a name")
     (assert (integer? x) "x must be an integer")
     (assert (integer? y) "y must be an integer")
@@ -321,7 +326,7 @@
       (swap! state update-in [:my-lines name :points]
              (fn [existing-points]
                ;(log "line to update: " existing-points " with " (:point point-map))
-               (conj existing-points [(translate-horizontally x) (translate-vertically y) val]))))))
+               (conj existing-points [x y val]))))))
 
 (defn- main-component [options-map]
   (let [{:keys [handler-fn height width]} options-map
@@ -354,7 +359,7 @@
 (defn- stageing-translators [min-x min-y max-x max-y graph-width graph-height]
   (let [horiz-trans-fn (fn [val] (u/scale {:min min-x :max max-x} {:min 0 :max graph-width} val))
         vert-trans-fn (fn [val] (u/scale {:min min-y :max max-y} {:min 0 :max graph-height} val))
-        trans-point-fn (fn [{x :x y :y val :val}] [(horiz-trans-fn x) (vert-trans-fn y) val])
+        trans-point-fn (fn [[x y val]] [(horiz-trans-fn x) (vert-trans-fn y) val])
         ]
     {:horiz horiz-trans-fn :vert vert-trans-fn :point trans-point-fn}))
 
@@ -370,7 +375,9 @@
         args (into {:comms ch} options-map)
         stageing (:stageing options-map)
         graph-width (:width options-map)
+        _ (assert graph-width ":width needs to be supplied at init")
         graph-height (:height options-map)
+        _ (assert graph-height ":height needs to be supplied at init")
         translators (stageing-translators (or (:min-x stageing) 0) (or (:min-y stageing) 0) (or (:max-x stageing) 999) (or (:max-y stageing) 999) graph-width graph-height)
         ]
     (reset! state default-state)
