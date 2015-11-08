@@ -46,7 +46,9 @@
 (defn mount-root []
   (g/init {:height graph-height :width graph-width})
   (insert-all-lines)
-  (insert-all-points))
+  ; Let incoming do this gradually
+  ;(insert-all-points)
+  )
 
 (defn ^:export run []
     (mount-root))
