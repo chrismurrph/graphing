@@ -2,7 +2,7 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async
              :refer [<! >! chan close! put! timeout]]
-            [graphing.graph-lines-db :refer [light-blue black]]
+            [graphing.known-data-model :refer [light-blue black]]
             [graphing.utils :refer [log distance bisect-vertical-between]]
             [goog.string :as gstring]
             [goog.string.format]
@@ -302,6 +302,13 @@
       (swap! state update-in [:my-lines]
              (fn [existing-lines]
                (conj existing-lines (hash-map name new-line)))))))
+
+;;
+;; Public API
+;;
+(defn remove-all-lines []
+  "This will start off with a blank graph - no lines, no points"
+  (reset! state default-state))
 
 ;;
 ;; Point that is added here should be in co-ordinate system of the staging area. Has to be in vector format:

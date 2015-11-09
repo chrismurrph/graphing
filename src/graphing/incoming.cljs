@@ -2,12 +2,52 @@
   (:require [cljs.core.async :as async
              :refer [<! >! chan close! put! timeout]]
             [graphing.utils :refer [log]]
-            [graphing.graph-lines-db :as db]
+            [graphing.known-data-model :as db]
             [graphing.graphing :as g])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 (defn already-gone [already-sent name x]
   (some #{{:line-name name :x x}} already-sent))
+
+;;
+;; Whenever its out channel is not blocked it will be generating a new gas value
+;;
+(defn generator [start end name out-chan]
+  (go-loop []
+    ;(log "In generator")
+    (>! out-chan (str "Hi from " name))
+    (recur)))
+
+;;
+;; Just needs the channels it is going to get values from
+;;
+(defn controller [out-chan chans]
+  (log (seq chans))
+  (go-loop []
+    (<! (timeout 300))
+    ;(log "In controller")
+    (let [chan-idx (rand-int (count chans))
+          chan (nth chans chan-idx)
+          next-val (<! chan)
+          _ (>! out-chan next-val)]
+      ;(log "Waiting from " chan-idx)
+      ;(log (<! chan))
+      (recur))
+  ))
+
+(defn query-remote-server
+  "Just needs the names that are to be queried and start/end times"
+  [names start end]
+  (let [new-gen (partial generator start end)
+        out-chan (chan)
+        gas-channels (into {} (map (fn [name] (vector name (chan))) names))
+        _ (log gas-channels)
+        _ (controller out-chan (vals gas-channels))
+        _ (mapv (fn [[name chan]] (new-gen name chan)) gas-channels)
+        ]
+    out-chan
+    )
+  )
 
 ;;
 ;; Temporarily make it a definition when want to make sure it never gets called!

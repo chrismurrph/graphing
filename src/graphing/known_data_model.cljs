@@ -1,4 +1,4 @@
-(ns graphing.graph-lines-db
+(ns graphing.known-data-model
   (:require [graphing.utils :as u]))
 
 (def black {:r 0 :g 0 :b 0})
@@ -33,7 +33,12 @@
 ;; Note that the x value is always increasing, meaning older come before newer, because x is time.
 ;;
 (def lines (atom [
-                  {:name "First line" :colour light-blue :dec-places 3 :units "" :positions [{:x 10 :y 10 :val 0.511} {:x 20 :y 20 :val 0.411} {:x 30 :y 30 :val 0.311} {:x 40 :y 40 :val 0.211} {:x 50 :y 50 :val 0.111}]}
+                  {:name "First line"
+                   :colour light-blue
+                   :dec-places 3
+                   :units ""
+                   :positions [{:x 10 :y 10 :val 0.511} {:x 20 :y 20 :val 0.411} {:x 30 :y 30 :val 0.311} {:x 40 :y 40 :val 0.211}
+                               {:x 50 :y 50 :val 0.111}]}
                   {:colour pink
                    :name "Methane"
                    :units "%"
