@@ -17,13 +17,19 @@
 ;(def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
 (def line-keys [:name :units :colour :dec-places])
 
+(defn receiver [name in-chan]
+  (go-loop []
+    (let [data-in (<! in-chan)]
+      (log name " JUST GOT " data-in)
+      (recur))))
+
 (defn create [lines in-chan]
   ""
   (g/remove-all-lines)
   (doseq [line lines]
     (g/add-line (select-keys line line-keys)))
   (go-loop []
-    (log (str "===> " (<! in-chan)))
+    ;(log (str "===> " (<! in-chan)))
     (recur))
   )
 
