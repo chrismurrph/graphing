@@ -8,7 +8,8 @@
 		 [org.clojure/core.async "0.2.371"]
 		 [org.clojure/core.match "0.2.1"]
 		 [figwheel "0.4.1"]
-     [com.andrewmcveigh/cljs-time "0.3.14"]]
+     ;[com.andrewmcveigh/cljs-time "0.3.14"]
+                 ]
 
   :plugins [[lein-cljsbuild "1.0.6"]
             [lein-figwheel "0.4.1"]]

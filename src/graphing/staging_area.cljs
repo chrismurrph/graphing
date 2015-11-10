@@ -1,7 +1,7 @@
 (ns graphing.staging-area
   (:require [cljs.core.async :as async
              :refer [<! >! chan close! put! timeout]]
-            [graphing.utils :refer [log]]
+            [graphing.utils :refer [log no-log]]
             [graphing.known-data-model :refer [light-blue green pink]]
             [graphing.graphing :as g]
             [graphing.known-data-model :as db])
@@ -20,7 +20,7 @@
 (defn receiver [name in-chan]
   (go-loop []
     (let [data-in (<! in-chan)]
-      (log name " JUST GOT " data-in)
+      (no-log name " JUST GOT " data-in)
       (recur))))
 
 (defn create [lines in-chan]
@@ -29,7 +29,7 @@
   (doseq [line lines]
     (g/add-line (select-keys line line-keys)))
   (go-loop []
-    ;(log (str "===> " (<! in-chan)))
+    (no-log (str "===> " (<! in-chan)))
     (recur))
   )
 

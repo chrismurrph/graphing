@@ -3,8 +3,7 @@
             [graphing.graphing :as g]
             [graphing.utils :refer [log]]
             [graphing.staging-area :as sa]
-            [graphing.incoming :as in]
-            [cljs-time.core :as ti])
+            [graphing.incoming :as in])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (def graph-width 640)
@@ -27,8 +26,8 @@
 ;; TODO Make a call to incoming/remote-server-time-str on server refresh and implement client-fast-by
 ;; ALSO How would you get an interrupt in a JS client when a TZ change happens?
 ;;
-(def start (ti/date-time 1986 10 14 4 3 27))
-(def end (ti/plus start (ti/months 1) (ti/weeks 3)))
+;(def start (ti/date-time 1986 10 14 4 3 27))
+;(def end (ti/plus start (ti/months 1) (ti/weeks 3)))
 
 (defn insert-known-points []
   (doseq [line @db/lines]
@@ -39,7 +38,7 @@
 (defn mount-root []
   (g/init {:height graph-height :width graph-width})
   (let [line-names (map :name @db/lines)
-        chan (in/query-remote-server line-names start end)
+        chan (in/query-remote-server line-names "" "")
         _ (sa/create @db/lines chan)])
   ; Let incoming do this gradually
   ;(insert-known-points)

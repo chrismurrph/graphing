@@ -3,6 +3,9 @@
 (defn log [& txts]
   (.log js/console (apply str txts)))
 
+(defn no-log [& txts]
+  ())
+
 (defn str-seq
   ([seq msg]
    (letfn [(lineify-seq [items]

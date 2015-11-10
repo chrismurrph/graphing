@@ -3,7 +3,8 @@
              :refer [<! >! chan close! put! timeout]]
             [graphing.utils :refer [log]]
             [graphing.known-data-model :as db]
-            [graphing.graphing :as g])
+            [graphing.graphing :as g]
+            [graphing.expected-time :as et])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 ;;
@@ -82,36 +83,79 @@
 ;; will need to be recorded. Thus we have an expected calendar and a series of blips. For instance we expect 28 days
 ;; in Feb when we do our calculations yet there may have been 29. So this is incorporated. So we actually have to
 ;; calculate the date with our approximate version of a year, in Clojurescript? YES!
+;; One of the good things about this approach is there is no need to know the formal details. There are I believe
+;; leap seconds etc - all will be taken account of if they happen.
 ;;
-(defn remote-server-time-str "")
+;(defn remote-server-time-str
+;  ""
+;  []
+;  ())
+
+;;
+;; (js/Date.)
+;; Nov 10 2015 19:09:31
+;;
+(def time-zero {:year 2015 :month "Nov" :day-of-month 10 :hour 19 :minute 9 :second 31})
+(def seconds-past-zero (atom {:time nil :count nil}))
+;(log "TIME ZERO: " time-zero)
+
+;;
+;; Record variances in order as they happen. This, time-zero and anomolies will all be durable i.e. be kept
+;; in the database.
+;;
+(def variances (atom []))
+
+(defn time-zero-five-seconds-timer []
+  (let [last-time-map (atom nil)]
+    (go-loop []
+             (<! (timeout 4998))
+             (let [now (js/Date.)
+                   now-map (et/parse-time now)]
+               (if (nil? @last-time-map)
+                 (reset! last-time-map now-map)
+                 (let [expected (et/in-five-seconds @last-time-map)
+                       are-equal (= expected now-map)]
+                   (if are-equal
+                     (do
+                       (reset! last-time-map now-map)
+                       (swap! seconds-past-zero (fn [{:keys [count]}] {:time now-map :count (+ count 5)})))
+                     (log "Not =: " expected " " now-map))))
+               (recur)))))
+
+;;
+;; If we start the timer close to exactly a second then it will be ages before the first drift. Problem
+;; being we have to record all drifts.
+;;
+(defn timer-starter []
+  (let [millis (.getMilliseconds (js/Date.))
+        on-the-exact (or (= millis 999) (= millis 0))]
+    (if on-the-exact
+      (time-zero-five-seconds-timer)
+      (recur))))
+
+(timer-starter)
 
 ;;
 ;; Directly puts dots on the screen. Really it is staging-area's job to do this intelligently. So this will go.
 ;;
-
-(defn already-gone [already-sent name x]
-  (some #{{:line-name name :x x}} already-sent))
-
-;;
-;; Temporarily make it a definition when want to make sure it never gets called!
-;;
 (def tick-timer
-  (go-loop [already-sent []]
-    (<! (timeout 1000))
-    ;(log "In timer")
-    (let [line-num (rand-int 3)
-          line (nth @db/lines line-num)
-          name (:name line)
-          line-size (count (:positions line))
-          chosen-idx (rand-int line-size)
-          position (nth (:positions line) chosen-idx)
-          chosen-x-pos (:x position)
-          has-gone (already-gone already-sent name chosen-x-pos)
-          ]
-      (if has-gone
-        (recur already-sent)
-        (do
-          ;(log name " at " position " about to go... ")
-          (g/add-point-by-sa {:name name :point [chosen-x-pos (:y position) (:val position)]})
-          (recur (conj already-sent {:line-name name :x chosen-x-pos}))))
-      )))
+  (let [already-gone (fn [already-sent name x] (some #{{:line-name name :x x}} already-sent))]
+    (go-loop [already-sent []]
+             (<! (timeout 1000))
+             ;(log "In timer")
+             (let [line-num (rand-int 3)
+                   line (nth @db/lines line-num)
+                   name (:name line)
+                   line-size (count (:positions line))
+                   chosen-idx (rand-int line-size)
+                   position (nth (:positions line) chosen-idx)
+                   chosen-x-pos (:x position)
+                   has-gone (already-gone already-sent name chosen-x-pos)
+                   ]
+               (if has-gone
+                 (recur already-sent)
+                 (do
+                   ;(log name " at " position " about to go... ")
+                   (g/add-point-by-sa {:name name :point [chosen-x-pos (:y position) (:val position)]})
+                   (recur (conj already-sent {:line-name name :x chosen-x-pos}))))
+               ))))
