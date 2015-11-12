@@ -4,7 +4,8 @@
             [graphing.utils :refer [log]]
             [graphing.known-data-model :as db]
             [graphing.graphing :as g]
-            [graphing.expected-time :as et])
+            [graphing.expected-time :as et]
+            [graphing.utils :as u])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 ;;
@@ -94,46 +95,87 @@
 ;;
 ;; (js/Date.)
 ;; Nov 10 2015 19:09:31
-;;
-(def time-zero {:year 2015 :month "Nov" :day-of-month 10 :hour 19 :minute 9 :second 31})
-(def seconds-past-zero (atom {:time nil :count nil}))
+;; This is what it will be when done properly - but needs to come from durable storage, and all
+;; the variances need to be stored there too. Obviously time-zero needs to be before any of the
+;; data samples are captured.
+;; (def time-zero {:year 2015 :month "Nov" :day-of-month 10 :hour 19 :minute 9 :second 31})
+
+;; If we just generate browser session data then time-zero being when the browser app starts is fine
+(def time-zero (atom))
+(defn host-time-zero [] (et/host-time-from-map @time-zero))
+
+(def seconds-past-zero (atom {:seconds-count nil}))
 ;(log "TIME ZERO: " time-zero)
 
 ;;
 ;; Record variances in order as they happen. This, time-zero and anomolies will all be durable i.e. be kept
-;; in the database.
+;; in the database. key is the expected time, which is a map, and val is the variance at that time.
+;; Note as a general point that expected time should never be shown to a user because it will usually be
+;; wrong.
 ;;
 (def variances (atom []))
 
+;;
+;; This is enough to describe time down to the nearest second.
+;;
+(defn current-time [] (:second-count seconds-past-zero))
+
+;;
+;; To display a time that have the number for.
+;;
+(defn time-as-map [current-time]
+  (let [before-variances (host-time-zero)
+        all-additions (+ current-time (reduce + (vals variances)))]))
+
 (defn time-zero-five-seconds-timer []
-  (let [last-time-map (atom nil)]
-    (go-loop []
-             (<! (timeout 4998))
+  (let [last-time-map (atom nil)
+        ;; Always recording the set time, but sometimes noticing time has moved faster
+        record-time (fn [new-actual-time-map]
+                      (reset! last-time-map new-actual-time-map)
+                      (swap! seconds-past-zero (fn [{:keys [seconds-count]}] {:seconds-count (+ seconds-count 5)}))
+                      )
+        in-five-seconds (partial et/in-n-seconds 5)
+        in-one-second (partial et/in-n-seconds 1)]
+    (go-loop [wait-time 5000] ;; 4998 lasted a long time, 5000 will be shorter, but lets keep at 5000
+             (<! (timeout wait-time))
              (let [now (js/Date.)
                    now-map (et/parse-time now)]
                (if (nil? @last-time-map)
-                 (reset! last-time-map now-map)
-                 (let [expected (et/in-five-seconds @last-time-map)
-                       are-equal (= expected now-map)]
+                 (do
+                   (reset! last-time-map now-map)
+                   (recur 5000))
+                 (let [expected-in-five-seconds-map (in-five-seconds @last-time-map)
+                       are-equal (= expected-in-five-seconds-map now-map)]
                    (if are-equal
                      (do
-                       (reset! last-time-map now-map)
-                       (swap! seconds-past-zero (fn [{:keys [count]}] {:time now-map :count (+ count 5)})))
-                     (log "Not =: " expected " " now-map))))
-               (recur)))))
+                       (record-time expected-in-five-seconds-map)
+                       (recur 5000))
+                     (let [diff (et/diff expected-in-five-seconds-map now)]
+                       (log "EXPECTED: " expected-in-five-seconds-map "ACTUAL: " now-map "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero))
+                       (if (and (< diff 1000) (pos? diff))
+                         (let [;extra-second-required (> diff 503)
+                               ;for-next-time-wrong (if extra-second-required (in-one-second expected-in-five-seconds-map) expected-in-five-seconds-map)
+                               for-next-time expected-in-five-seconds-map
+                               ]
+                           ;(log "Extra second has been added: " extra-second-required)
+                           (record-time for-next-time)
+                           ;; Don't need to do anything else other than happen sooner next time
+                           (recur (- 5000 diff 500)))
+                         (u/crash (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
 
 ;;
-;; If we start the timer close to exactly a second then it will be ages before the first drift. Problem
-;; being we have to record all drifts.
+;; No real reason to start more or less exactly on a second, but will make reasoning easier.
 ;;
-(defn timer-starter []
-  (let [millis (.getMilliseconds (js/Date.))
+(defn start-timer [count]
+  (let [new-date (js/Date.)
+        millis (.getMilliseconds new-date)
         on-the-exact (or (= millis 999) (= millis 0))]
     (if on-the-exact
-      (time-zero-five-seconds-timer)
-      (recur))))
-
-(timer-starter)
+      (do
+        (reset! time-zero (et/parse-time new-date))
+        (time-zero-five-seconds-timer))
+      (recur (inc count)))))
+(defonce _ (start-timer 0))
 
 ;;
 ;; Directly puts dots on the screen. Really it is staging-area's job to do this intelligently. So this will go.

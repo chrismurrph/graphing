@@ -22,6 +22,14 @@
   ([seq]
    (pr-seq nil seq)))
 
+(defn crash
+  ([^String msg]
+   (throw (js/Error. msg))
+    )
+  ([]
+   (crash "Purposeful crash"))
+  )
+
 (defn round [n]
   (js/Math.round n))
 
@@ -63,6 +71,11 @@
         y-res (+ y0 (* x-from-start y-ratio))
         val-res (+ val0 (* x-from-start val-ratio))]
     {:proportional-y y-res :proportional-val val-res}))
+
+(defn abs [val]
+  (if (neg? val)
+    (* -1 val)
+    val))
 
 (defn style [& info]
   {:style (.trim (apply str (map #(let [[kwd val] %]

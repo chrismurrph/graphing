@@ -37,11 +37,10 @@
 
 (defn mount-root []
   (g/init {:height graph-height :width graph-width})
-  (let [line-names (map :name @db/lines)
+  (let [;_ (in/start-timer)
+        line-names (map :name @db/lines)
         chan (in/query-remote-server line-names "" "")
         _ (sa/create @db/lines chan)])
-  ; Let incoming do this gradually
-  ;(insert-known-points)
   )
 
 (defn ^:export run []

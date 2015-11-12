@@ -87,13 +87,19 @@
 
 (def some-points (into (sorted-map) [[23 [1 2]] [17 [3 4]]]))
 
+(def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
+(def months ["Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"])
+(defn month-as-number [month-str] (.indexOf months month-str))
+
 (defn -main
   [& args]
   ;(println (tick-lines 20 [60 70]))
   ;(println (all-points-component input))
-  (println some-points)
-  (println (conj some-points [13 [5 6]]))
-  (let [points (for [point some-points]
-                 point)]
-    (println points))
+  ;(println some-points)
+  ;(println (conj some-points [13 [5 6]]))
+  ;(let [points (for [point some-points]
+  ;               point)]
+  ;  (println points))
+  (println (month-as-number "Jan"))
+  (println (month-as-number "Oct"))
   )
