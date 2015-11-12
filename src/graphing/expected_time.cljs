@@ -196,9 +196,9 @@
 (add-watch seconds-past-zero :watcher
            (fn [key atom old-state new-state]
              (let [true-time (:seconds-count new-state)
-                   _ (log "True time: " true-time)
+                   ;_ (log "True time: " true-time)
                    derived-true-time (true->derived-time true-time)
-                   do-echo (= (mod true-time 10) 0)]
+                   do-echo (= (mod true-time 500) 0)]
                (when do-echo
                  (let [host-now (host-time)]
                  (log (str "true-time now: " derived-true-time ", host-time: " host-now)))))))
@@ -218,7 +218,7 @@
                       (swap! seconds-past-zero (fn [{:keys [seconds-count]}] {:seconds-count (+ seconds-count 5)}))
                       )
         in-five-seconds (partial in-n-seconds 5)]
-    (go-loop [wait-time 0] ;; 4998 lasted a long time, 5000 will be shorter, but lets keep at 5000
+    (go-loop [wait-time 0]
              (<! (timeout wait-time))
              (let [host-now (host-time)
                    now-derived (host->derived-time host-now)]
@@ -233,7 +233,7 @@
                        (record-time expected-in-five-seconds-map)
                        (recur 5000))
                      (let [diff (host-diff expected-in-five-seconds-map host-now)]
-                       (log "EXPECTED: " expected-in-five-seconds-map "ACTUAL: " now-derived "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero))
+                       (log "EXPECTED: " expected-in-five-seconds-map " ACTUAL: " now-derived "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero))
                        (if (and (< diff 1000) (pos? diff))
                          (let [;extra-second-required (> diff 503)
                                ;for-next-time-wrong (if extra-second-required (in-one-second expected-in-five-seconds-map) expected-in-five-seconds-map)
@@ -242,7 +242,7 @@
                            ;(log "Extra second has been added: " extra-second-required)
                            (record-time for-next-time)
                            ;; Don't need to do anything else other than happen sooner next time
-                           (recur (- 5000 diff 500)))
+                           (recur (- 5000 1000)))
                          (u/crash (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
 
 ;;
