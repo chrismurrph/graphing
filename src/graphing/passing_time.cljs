@@ -1,4 +1,4 @@
-(ns graphing.expected-time
+(ns graphing.passing-time
   (:require [cljs.core.async :as async
              :refer [<! >! chan close! put! timeout]]
             [graphing.utils :refer [log]]
@@ -22,33 +22,36 @@
 
 (defn host-time
   ([] (js/Date.))
-  ;([millis] (js/Date. millis))
+  ([millis] (js/Date. millis))
   ([year month-num day-of-month hour minute second] (js/Date. year month-num day-of-month hour minute second)))
 
 (defn host-add-seconds [js-time seconds]
   (let [given-millis (.getTime js-time)
         augmented-millis (+ (* seconds 1000) given-millis)
-        res (js/Date. augmented-millis)]
+        res (host-time augmented-millis)]
     res))
 
-(defn derived->host-time [derived-time]
-  (let [{:keys [year month day-of-month hour minute second]} derived-time
+(defn map->host-time [map-time]
+  (let [{:keys [year month day-of-month hour minute second]} map-time
         host-time (host-time year (month-as-number month) day-of-month hour minute second)
         ]
     host-time))
 
 ;;
-;; When this function is called there is a known difference of at least half a second. This function returns the
-;; difference in milliseconds. Tiny drifts can be adjusted for. Anything else is either a variance or an anomolie.
+;; This function returns the difference in milliseconds. Tiny drifts can be adjusted for. Anything else is
+;; either a variance or an anomolie.
 ;; If the return value is +ive then current time has raced ahead, which by convention is what we are intending to
 ;; happen by making the async wait time exactly five seconds.
+;; js-time can't ever be slowed down, but it seems evaluating instructions outside the core-async 5000 wait
+;; certainly can be. In fact it won't be so much evaluating the instructions as other things going on in the
+;; machine. We can probably (eventually) cater for large discrepancies, even > 5 seconds.
 ;;
 ;; new Date(year, month, day, hours, minutes, seconds, milliseconds)
 ;;
-(defn host-diff [expected-map js-time]
-  (let [expected-time (derived->host-time expected-map)
+(defn- host-diff [expected-map js-time]
+  (let [expected-time (map->host-time expected-map)
         ;_ (log "expected-time: " expected-time)
-        diff (- (.getMilliseconds js-time) (.getMilliseconds expected-time))
+        diff (- (.getTime js-time) (.getTime expected-time))
         ;_ (log "Amount that current: " current-time " is more than expected: " expected-time ", is: " diff)
         ;_ (assert (>= (u/abs diff) 500) (str "diff not >= 500, but: " diff))
         ]
@@ -84,8 +87,6 @@
                   (merge in-time-map {:month next-month :day-of-month 1 :hour 0 :minute 0 :second (more-at-the-top second)}))))))))))
 
 ;;
-;; What comes in is (js/Date.), yet here we interpret it as a String, and call .getMilliseconds on it. There must
-;; be hidden conversion to String.
 ;; example
 ;; Nov 10 2015 19:09:31
 ;;
@@ -111,7 +112,7 @@
            (fn [key atom old-state new-state]
              (log "time-zero set to: " new-state)))
 
-(defn host-time-zero [] (derived->host-time @time-zero))
+(defn host-time-zero [] (map->host-time @time-zero))
 
 ;;
 ;; Record variances in order as they happen. This, time-zero and anomolies will all be durable i.e. be kept
@@ -121,20 +122,26 @@
 ;;
 (def variances (atom []))
 
-;; (+ true-time (reduce + (vals variances)))
-(defn sum-variances-up-to [true-time]
+;; (+ passing-time (reduce + (vals variances)))
+(defn- sum-variances-up-to [passing-time]
   0)
 
 ;;
-;; To display a derived-time that have the true-time for.
+;; Return derived-time from passing-time.
+;; Derived time might be a map but its definition is from applying all the variances and anomolies to
+;; come up with the same as what the machine holds.
 ;;
-(defn true->derived-time [true-time]
+(defn passing->derived-time [passing-time]
   (let [before-variances (host-time-zero)
-        variance-additions (sum-variances-up-to true-time)
-        all-additions (+ true-time variance-additions)
+        variance-additions (sum-variances-up-to passing-time)
+        all-additions (+ passing-time variance-additions)
         js-res (host-add-seconds before-variances all-additions)
         res (host->derived-time js-res)]
     res))
+
+(defn derived->passing-time [derived-time]
+  (let [{:keys [year month day-of-month hour minute second]} derived-time]
+    (u/crash "Does not need to exist - only the opposite - always have passing times, convert using opposite when need to display")))
 
 ;;
 ;; It might be better (going from Rich Hickey saying not to ship time around - an aside in one of his talks) not
@@ -188,27 +195,49 @@
 ;; data samples are captured.
 ;; (def time-zero {:year 2015 :month "Nov" :day-of-month 10 :hour 19 :minute 9 :second 31})
 
-;; true-time is the number of seconds since time-zero. That's what we always use for time! This would be
-;; the current true-time, if it were not only calculated every 5 seconds.
+;; passing-time is the number of seconds since time-zero. That's what we always use for time! This would be
+;; the current passing-time, if it were not only calculated every 5 seconds.
 (def seconds-past-zero (atom {:seconds-count nil}))
 ;(log "TIME ZERO: " time-zero)
 
+;;
+;; It is not a good idea to make this watch do anything. More than one second difference would be very
+;; surprising to see. Note that TZ changes - any variances or anomolies - do not make it through to
+;; here. You are seeing passing time only. The check is an ultimate sanity check - any real checking has
+;; already been done.
+;;
 (add-watch seconds-past-zero :watcher
            (fn [key atom old-state new-state]
-             (let [true-time (:seconds-count new-state)
-                   ;_ (log "True time: " true-time)
-                   derived-true-time (true->derived-time true-time)
-                   do-echo (= (mod true-time 500) 0)]
+             (let [passing-time (:seconds-count new-state)
+                   ;_ (log "True time: " passing-time)
+                   derived-passing-time (passing->derived-time passing-time)
+                   do-echo (= (mod passing-time 1000) 0)]
                (when do-echo
-                 (let [host-now (host-time)]
-                 (log (str "true-time now: " derived-true-time ", host-time: " host-now)))))))
+                 (let [host-now (host-time)
+                       host-derived (host->derived-time host-now)]
+                   (log (str "passing-time: " derived-passing-time ", host-time: " host-derived)))))))
+
+;;
+;; passing-time can also be in milliseconds, in which case it will of course be the number of milliseconds that
+;; have passed since zero time.
+;;
+(defn current-passing-millis-time []
+  (let [passing-time (:seconds-count @seconds-past-zero)
+        derived-passing-time (passing->derived-time passing-time)
+        derived-passing-as-host (map->host-time derived-passing-time)
+        host-now (host-time)
+        host-ahead-by (- (.getTime host-now) (.getTime derived-passing-as-host))
+        _ (assert (<= 0 host-ahead-by 5999))
+        _ (when (>= host-ahead-by 5000) (log "Unusual to see host ahead by 5000 or more. Derived: " derived-passing-time ", Host: " host-now))
+        res (+ (* 1000 passing-time) host-ahead-by)
+        ]
+    res))
 
 ;;
 ;; This is enough to describe time down to the nearest second.
-;; Hmm - needs improved to do that. Will currently be up to 5 seconds
-;; old.
+;; (Even though it is only being collected every 5 seconds)
 ;;
-(defn current-true-time [] (:second-count seconds-past-zero))
+(defn current-passing-time [] (/ (current-passing-millis-time) 1000))
 
 (defn time-zero-five-seconds-timer []
   (let [last-time-map (atom nil)
@@ -234,15 +263,12 @@
                        (recur 5000))
                      (let [diff (host-diff expected-in-five-seconds-map host-now)]
                        (log "EXPECTED: " expected-in-five-seconds-map " ACTUAL: " now-derived "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero))
-                       (if (and (< diff 1000) (pos? diff))
-                         (let [;extra-second-required (> diff 503)
-                               ;for-next-time-wrong (if extra-second-required (in-one-second expected-in-five-seconds-map) expected-in-five-seconds-map)
-                               for-next-time expected-in-five-seconds-map
-                               ]
-                           ;(log "Extra second has been added: " extra-second-required)
+                       (if (and (< (u/abs diff) 2000) (pos? diff))  ;; Other things using the machine seem to cause this
+                                                                    ;; If the process is starved so much there's > 2 seconds delay here - then we want to crash!
+                         (let [for-next-time expected-in-five-seconds-map
+                               advance (if (pos? diff) 1000 -1000)]
                            (record-time for-next-time)
-                           ;; Don't need to do anything else other than happen sooner next time
-                           (recur (- 5000 1000)))
+                           (recur (- 5000 advance)))
                          (u/crash (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
 
 ;;

@@ -4,7 +4,7 @@
             [graphing.utils :refer [log]]
             [graphing.known-data-model :as db]
             [graphing.graphing :as g]
-            [graphing.expected-time :as et]
+            [graphing.passing-time :as et]
             [graphing.utils :as u])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
