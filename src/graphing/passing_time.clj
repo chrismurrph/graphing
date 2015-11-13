@@ -1,10 +1,12 @@
 (ns graphing.passing-time
-  (:require [cljs.core.async :as async
-             :refer [<! >! chan close! put! timeout]]
-            [graphing.utils :refer [log]]
+  (:gen-class)
+  (:require [graphing.utils :refer [log]]
             [clojure.string :as str]
             [graphing.utils :as u])
-  (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
+  (:import (java.util Date)
+           (java.util Arrays)
+           (java.text SimpleDateFormat))
+  (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload))
 
 ;;
 ;; new Date("October 13, 2014 11:13:00") should work in js
@@ -16,32 +18,41 @@
         res (str month " " day-of-month ", " year " " hour ":" minute ":" second)]
     res))
 
+(def binarySearch Arrays/binarySearch)
+
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 (def months ["Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"])
-(defn month-as-number [month-str] (.indexOf (to-array months) month-str))
+(defn month-as-number [month-str] (binarySearch (to-array months) month-str))
 
 (defn host-time
-  ([] (js/Date.))
-  ([millis] (js/Date. millis))
-  ([year month-num day-of-month hour minute second] (js/Date. year month-num day-of-month hour minute second)))
+  ([] (Date.))
+  ([^long millis] (Date. millis))
+  ([year month-num day-of-month hour minute second] (Date. year month-num day-of-month hour minute second)))
 
-(defn host-add-seconds [js-time seconds]
-  (let [given-millis (.getTime js-time)
+(defn host-add-seconds [java-time seconds]
+  (let [given-millis (.getTime java-time)
         augmented-millis (+ (* seconds 1000) given-millis)
         res (host-time augmented-millis)]
     res))
 
-(defn- millis-component-host-time [js-time]
-  (.getMilliseconds js-time))
+(defn- millis-component-host-time [java-time]
+  (let [millis-per-second 1000
+        total-millis (.getTime java-time)
+        res (mod total-millis millis-per-second)]
+    res))
 
 ;;
 ;; example
 ;; Nov 10 2015 19:09:31
+;; MM dd yyyy HH:mm:ss
 ;;
-(defn stringify-time [js-time]
-  (let [[_ month day-of-month year time-str] (str/split js-time #" ")
+(defn stringify-time [java-time]
+  (let [specific-format (SimpleDateFormat. "MM dd yyyy HH:mm:ss")
+        as-str (.format specific-format java-time)
+        [month day-of-month year time-str] (str/split as-str #" ")
+        month-as-idx (dec (u/parse-int month))
         [hour min sec] (str/split time-str #":")]
-    {:month month :day-of-month day-of-month :year year :hour hour :min min :sec sec})
+    {:month (nth months month-as-idx) :day-of-month day-of-month :year year :hour hour :min min :sec sec})
   )
 
 (defn map->host-time [map-time]
@@ -104,8 +115,8 @@
   ;(log "IN:" host-time)
   (let [millis (millis-component-host-time host-time)
         {:keys [month day-of-month year hour min sec]} (stringify-time host-time)
-        seconds (int sec)
-        b4-rounding {:year (int year) :month month :day-of-month (int day-of-month) :hour (int hour) :minute (int min) :second seconds}
+        seconds (u/parse-int sec)
+        b4-rounding {:year (u/parse-int year) :month month :day-of-month (u/parse-int day-of-month) :hour (u/parse-int hour) :minute (u/parse-int min) :second seconds}
         more-than-half-way-to-next (>= millis 500)]
     ;(log month " " day-of-month " " year " " hour " " min " " sec)
     (if more-than-half-way-to-next
@@ -114,7 +125,7 @@
     ))
 
 ;; If we just generate browser session data then time-zero being when the browser app starts is fine
-(def time-zero (atom))
+(def time-zero (atom nil))
 
 (add-watch time-zero :watcher
            (fn [key atom old-state new-state]
@@ -219,7 +230,7 @@
              (let [passing-time (:seconds-count new-state)
                    ;_ (log "True time: " passing-time)
                    derived-passing-time (passing->derived-time passing-time)
-                   do-echo (= (mod passing-time 1000) 0)]
+                   do-echo (= (mod passing-time 100) 0)]
                (when do-echo
                  (let [host-now (host-time)
                        host-derived (host->derived-time host-now)]
@@ -256,7 +267,9 @@
                       )
         in-five-seconds (partial in-n-seconds 5)]
     (go-loop [wait-time 0]
+             (log "B4 timeout")
              (<! (timeout wait-time))
+             (log "At timeout")
              (let [host-now (host-time)
                    now-derived (host->derived-time host-now)]
                (if (nil? @last-time-map)
@@ -264,6 +277,7 @@
                    (reset! last-time-map now-derived)
                    (recur 5000))
                  (let [expected-in-five-seconds-map (in-five-seconds @last-time-map)
+                       _ (log "In 5 secs: " expected-in-five-seconds-map)
                        are-equal (= expected-in-five-seconds-map now-derived)]
                    (if are-equal
                      (do
@@ -290,7 +304,17 @@
       (do
         (reset! time-zero (host->derived-time new-host-time))
         (time-zero-five-seconds-timer))
-      (recur (inc count)))))
+      (do
+        ;(log "Not on exact but " millis)
+        (recur (inc count))))))
 
-(defonce _ (start-timer 0))
+;(defonce _ (start-timer 0))
 
+;; year month-num day-of-month hour minute second
+(defn -main
+  [& args]
+  ;(println (host-time 2015 0 14 11 22 06))
+  (start-timer 0)
+  ;(println (stringify-time (host-time)))
+  (Thread/sleep 100000)
+  )

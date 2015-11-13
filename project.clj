@@ -31,4 +31,4 @@
                 :optimizations :none}}]                
                 }
 
-  :main ^:skip-aot graphing.scratch)
+  :main ^:skip-aot graphing.passing-time)
