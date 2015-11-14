@@ -18,11 +18,9 @@
         res (str month " " day-of-month ", " year " " hour ":" minute ":" second)]
     res))
 
-(def binarySearch Arrays/binarySearch)
-
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 (def months ["Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"])
-(defn month-as-number [month-str] (binarySearch (to-array months) month-str))
+(defn month-as-number [month-str] (Arrays/binarySearch (to-array months) month-str))
 
 (defn host-time
   ([] (Date.))
