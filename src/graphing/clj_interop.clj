@@ -1,16 +1,16 @@
 (ns graphing.clj-interop
+  (:gen-class)
   (:require
     [clojure.string :as str]
     [graphing.interop :as i]
     )
-  (:import (java.util Arrays Date)
-           (graphing.interop ITimeInterop)
-           (java.text SimpleDateFormat)))
+  (:import (java.text SimpleDateFormat)
+           (java.util Arrays Date)))
 
 (def months ["Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"])
 
 (defrecord CljTime []
-  ITimeInterop
+  i/ITimeInterop
   (month-as-number [_ month-str]
     (Arrays/binarySearch (to-array i/months) month-str))
   (host-time [_]
@@ -35,7 +35,7 @@
     (let [specific-format (SimpleDateFormat. "MM dd yyyy HH:mm:ss")
           as-str (.format specific-format host-time)
           [month day-of-month year time-str] (str/split as-str #" ")
-          month-as-idx (dec (.parse-int this month))
+          month-as-idx (dec (i/parse-int this month))
           [hour min sec] (str/split time-str #":")]
       {:month (nth i/months month-as-idx) :day-of-month day-of-month :year year :hour hour :min min :sec sec}))
   (crash [_ msg]

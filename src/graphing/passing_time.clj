@@ -1,9 +1,8 @@
 (ns graphing.passing-time
   (:require [graphing.utils :refer [log]])
   (:require [graphing.interop :as i])
-  (:require [graphing.clj-interop :refer [CljTime]])
   (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload)
-  (:import [graphing.clj_interop CljTime]))
+  (:import (graphing.clj_interop CljTime)))
 
 (defn format-time
   [time-map]
@@ -16,7 +15,7 @@
     (* -1 val)
     val))
 
-(def abst-time (new CljTime))
+(def abst-time (CljTime.))
 
 (defn host-add-seconds [system-time seconds]
   (let [given-millis (.getTime system-time)
