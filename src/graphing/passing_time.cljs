@@ -2,37 +2,48 @@
   (:require [cljs.core.async :as async
              :refer [<! >! chan close! put! timeout]]
             [graphing.utils :refer [log]]
-            [clojure.string :as str]
-            [graphing.utils :as u])
+            [clojure.string :as str])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
-;;
-;; new Date("October 13, 2014 11:13:00") should work in js
-;; Doesn't however
-;;
 (defn format-time
   [time-map]
   (let [{:keys [year month day-of-month hour minute second]} time-map
         res (str month " " day-of-month ", " year " " hour ":" minute ":" second)]
     res))
 
+(defn crash
+  ([^String msg]
+   (throw (js/Error. msg))
+    )
+  ([]
+   (crash "Purposeful crash"))
+  )
+
+(defn abs [val]
+  (if (neg? val)
+    (* -1 val)
+    val))
+
+(defn host-add-seconds [system-time seconds]
+  (let [given-millis (.getTime system-time)
+        augmented-millis (+ (* seconds 1000) given-millis)
+        res (host-time augmented-millis)]
+    res))
+
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 (def months ["Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"])
-(defn month-as-number [month-str] (.indexOf (to-array months) month-str))
+(defn- month-as-number [month-str] (.indexOf (to-array months) month-str))
 
 (defn host-time
   ([] (js/Date.))
   ([millis] (js/Date. millis))
   ([year month-num day-of-month hour minute second] (js/Date. year month-num day-of-month hour minute second)))
 
-(defn host-add-seconds [js-time seconds]
-  (let [given-millis (.getTime js-time)
-        augmented-millis (+ (* seconds 1000) given-millis)
-        res (host-time augmented-millis)]
-    res))
-
 (defn- millis-component-host-time [js-time]
   (.getMilliseconds js-time))
+
+(defn- parse-int [str]
+  (int str))
 
 ;;
 ;; example
@@ -104,8 +115,8 @@
   ;(log "IN:" host-time)
   (let [millis (millis-component-host-time host-time)
         {:keys [month day-of-month year hour min sec]} (stringify-time host-time)
-        seconds (int sec)
-        b4-rounding {:year (int year) :month month :day-of-month (int day-of-month) :hour (int hour) :minute (int min) :second seconds}
+        seconds (parse-int sec)
+        b4-rounding {:year (parse-int year) :month month :day-of-month (parse-int day-of-month) :hour (parse-int hour) :minute (parse-int min) :second seconds}
         more-than-half-way-to-next (>= millis 500)]
     ;(log month " " day-of-month " " year " " hour " " min " " sec)
     (if more-than-half-way-to-next
@@ -114,7 +125,7 @@
     ))
 
 ;; If we just generate browser session data then time-zero being when the browser app starts is fine
-(def time-zero (atom))
+(def time-zero (atom nil))
 
 (add-watch time-zero :watcher
            (fn [key atom old-state new-state]
@@ -149,7 +160,7 @@
 
 (defn derived->passing-time [derived-time]
   (let [{:keys [year month day-of-month hour minute second]} derived-time]
-    (u/crash "Does not need to exist - only the opposite - always have passing times, convert using opposite when need to display")))
+    (crash "Does not need to exist - only the opposite - always have passing times, convert using opposite when need to display")))
 
 ;;
 ;; It might be better (going from Rich Hickey saying not to ship time around - an aside in one of his talks) not
@@ -219,7 +230,7 @@
              (let [passing-time (:seconds-count new-state)
                    ;_ (log "True time: " passing-time)
                    derived-passing-time (passing->derived-time passing-time)
-                   do-echo (= (mod passing-time 1000) 0)]
+                   do-echo (= (mod passing-time 100) 0)]
                (when do-echo
                  (let [host-now (host-time)
                        host-derived (host->derived-time host-now)]
@@ -271,13 +282,13 @@
                        (recur 5000))
                      (let [diff (host-ahead-of-map-by expected-in-five-seconds-map host-now)]
                        (log "EXPECTED: " expected-in-five-seconds-map " ACTUAL: " now-derived "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero))
-                       (if (and (< (u/abs diff) 2000) (pos? diff))  ;; Other things using the machine seem to cause this
+                       (if (and (< (abs diff) 2000) (pos? diff))  ;; Other things using the machine seem to cause this
                                                                     ;; If the process is starved so much there's > 2 seconds delay here - then we want to crash!
                          (let [for-next-time expected-in-five-seconds-map
                                advance (if (pos? diff) 1000 -1000)]
                            (record-time for-next-time)
                            (recur (- 5000 advance)))
-                         (u/crash (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
+                         (crash (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
 
 ;;
 ;; No real reason to start more or less exactly on a second, but will make reasoning easier.

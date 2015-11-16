@@ -1,43 +1,53 @@
 (ns graphing.passing-time
   (:gen-class)
   (:require [graphing.utils :refer [log]]
-            [clojure.string :as str]
-            [graphing.utils :as u])
+            [clojure.string :as str])
   (:import (java.util Date)
            (java.util Arrays)
            (java.text SimpleDateFormat))
   (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload))
 
-;;
-;; new Date("October 13, 2014 11:13:00") should work in js
-;; Doesn't however
-;;
 (defn format-time
   [time-map]
   (let [{:keys [year month day-of-month hour minute second]} time-map
         res (str month " " day-of-month ", " year " " hour ":" minute ":" second)]
     res))
 
+(defn crash
+  ([^String msg]
+   (throw (Throwable. msg)))
+  ([]
+   (crash "Purposeful crash"))
+  )
+
+(defn abs [val]
+  (if (neg? val)
+    (* -1 val)
+    val))
+
+(defn host-add-seconds [system-time seconds]
+  (let [given-millis (.getTime system-time)
+        augmented-millis (+ (* seconds 1000) given-millis)
+        res (host-time augmented-millis)]
+    res))
+
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 (def months ["Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"])
-(defn month-as-number [month-str] (Arrays/binarySearch (to-array months) month-str))
+(defn- month-as-number [month-str] (Arrays/binarySearch (to-array months) month-str))
 
 (defn host-time
   ([] (Date.))
   ([^long millis] (Date. millis))
   ([year month-num day-of-month hour minute second] (Date. year month-num day-of-month hour minute second)))
 
-(defn host-add-seconds [java-time seconds]
-  (let [given-millis (.getTime java-time)
-        augmented-millis (+ (* seconds 1000) given-millis)
-        res (host-time augmented-millis)]
-    res))
-
 (defn- millis-component-host-time [java-time]
   (let [millis-per-second 1000
         total-millis (.getTime java-time)
         res (mod total-millis millis-per-second)]
     res))
+
+(defn- parse-int [str]
+  (Integer. (re-find #"[0-9]*" str)))
 
 ;;
 ;; example
@@ -48,7 +58,7 @@
   (let [specific-format (SimpleDateFormat. "MM dd yyyy HH:mm:ss")
         as-str (.format specific-format java-time)
         [month day-of-month year time-str] (str/split as-str #" ")
-        month-as-idx (dec (u/parse-int month))
+        month-as-idx (dec (parse-int month))
         [hour min sec] (str/split time-str #":")]
     {:month (nth months month-as-idx) :day-of-month day-of-month :year year :hour hour :min min :sec sec})
   )
@@ -113,8 +123,8 @@
   ;(log "IN:" host-time)
   (let [millis (millis-component-host-time host-time)
         {:keys [month day-of-month year hour min sec]} (stringify-time host-time)
-        seconds (u/parse-int sec)
-        b4-rounding {:year (u/parse-int year) :month month :day-of-month (u/parse-int day-of-month) :hour (u/parse-int hour) :minute (u/parse-int min) :second seconds}
+        seconds (parse-int sec)
+        b4-rounding {:year (parse-int year) :month month :day-of-month (parse-int day-of-month) :hour (parse-int hour) :minute (parse-int min) :second seconds}
         more-than-half-way-to-next (>= millis 500)]
     ;(log month " " day-of-month " " year " " hour " " min " " sec)
     (if more-than-half-way-to-next
@@ -158,7 +168,7 @@
 
 (defn derived->passing-time [derived-time]
   (let [{:keys [year month day-of-month hour minute second]} derived-time]
-    (u/crash "Does not need to exist - only the opposite - always have passing times, convert using opposite when need to display")))
+    (crash "Does not need to exist - only the opposite - always have passing times, convert using opposite when need to display")))
 
 ;;
 ;; It might be better (going from Rich Hickey saying not to ship time around - an aside in one of his talks) not
@@ -265,9 +275,7 @@
                       )
         in-five-seconds (partial in-n-seconds 5)]
     (go-loop [wait-time 0]
-             (log "B4 timeout")
              (<! (timeout wait-time))
-             (log "At timeout")
              (let [host-now (host-time)
                    now-derived (host->derived-time host-now)]
                (if (nil? @last-time-map)
@@ -275,7 +283,6 @@
                    (reset! last-time-map now-derived)
                    (recur 5000))
                  (let [expected-in-five-seconds-map (in-five-seconds @last-time-map)
-                       _ (log "In 5 secs: " expected-in-five-seconds-map)
                        are-equal (= expected-in-five-seconds-map now-derived)]
                    (if are-equal
                      (do
@@ -283,13 +290,13 @@
                        (recur 5000))
                      (let [diff (host-ahead-of-map-by expected-in-five-seconds-map host-now)]
                        (log "EXPECTED: " expected-in-five-seconds-map " ACTUAL: " now-derived "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero))
-                       (if (and (< (u/abs diff) 2000) (pos? diff))  ;; Other things using the machine seem to cause this
+                       (if (and (< (abs diff) 2000) (pos? diff))  ;; Other things using the machine seem to cause this
                                                                     ;; If the process is starved so much there's > 2 seconds delay here - then we want to crash!
                          (let [for-next-time expected-in-five-seconds-map
                                advance (if (pos? diff) 1000 -1000)]
                            (record-time for-next-time)
                            (recur (- 5000 advance)))
-                         (u/crash (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
+                         (crash (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
 
 ;;
 ;; No real reason to start more or less exactly on a second, but will make reasoning easier.
@@ -302,17 +309,15 @@
       (do
         (reset! time-zero (host->derived-time new-host-time))
         (time-zero-five-seconds-timer))
-      (do
-        ;(log "Not on exact but " millis)
-        (recur (inc count))))))
+      (recur (inc count)))))
 
-;(defonce _ (start-timer 0))
+(defonce _ (start-timer 0))
 
 ;; year month-num day-of-month hour minute second
 (defn -main
   [& args]
   ;(println (host-time 2015 0 14 11 22 06))
-  (start-timer 0)
+  ;(start-timer 0)
   ;(println (stringify-time (host-time)))
   (Thread/sleep 100000)
   )
