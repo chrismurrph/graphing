@@ -35,13 +35,13 @@
     (let [specific-format (SimpleDateFormat. "MM dd yyyy HH:mm:ss")
           as-str (.format specific-format host-time)
           [month day-of-month year time-str] (str/split as-str #" ")
-          month-as-idx (dec (parse-int this month))
+          month-as-idx (dec (.parse-int this month))
           [hour min sec] (str/split time-str #":")]
       {:month (nth i/months month-as-idx) :day-of-month day-of-month :year year :hour hour :min min :sec sec}))
   (crash [_ msg]
     (throw (Throwable. msg)))
   (crash [this]
-    (crash this "Purposeful crash"))
+    (.crash this "Purposeful crash"))
   (log [_ txts]
     (println (apply str txts)))
   (no-log [_ txts]
