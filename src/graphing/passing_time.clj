@@ -1,5 +1,4 @@
 (ns graphing.passing-time
-  (:require [graphing.utils :refer [log]])
   (:require [graphing.interop :as i])
   (:require [graphing.clj-interop :as ci])
   (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload))
@@ -58,7 +57,7 @@
 (defn- get-next-month [in-month]
   (if (= in-month "Dec")
     nil
-    (nth i/months (inc (month-as-number abst-time abst-time in-month)))))
+    (nth i/months (inc (i/month-as-number abst-time in-month)))))
 
 (defn- in-n-seconds
   "Following standard conventions, what do we expect the time to be in n seconds from the given time"
@@ -83,10 +82,10 @@
 (defn host->derived-time
   [host-time]
   ;(log "IN:" host-time)
-  (let [millis (millis-component-host-time abst-time host-time)
-        {:keys [month day-of-month year hour min sec]} (stringify-time abst-time host-time)
-        seconds (parse-int abst-time sec)
-        b4-rounding {:year (parse-int abst-time year) :month month :day-of-month (parse-int abst-time day-of-month) :hour (parse-int abst-time hour) :minute (parse-int abst-time min) :second seconds}
+  (let [millis (i/millis-component-of-host-time abst-time host-time)
+        {:keys [month day-of-month year hour min sec]} (i/stringify-time abst-time host-time)
+        seconds (i/parse-int abst-time sec)
+        b4-rounding {:year (i/parse-int abst-time year) :month month :day-of-month (i/parse-int abst-time day-of-month) :hour (i/parse-int abst-time hour) :minute (i/parse-int abst-time min) :second seconds}
         more-than-half-way-to-next (>= millis 500)]
     ;(log month " " day-of-month " " year " " hour " " min " " sec)
     (if more-than-half-way-to-next
@@ -99,7 +98,7 @@
 
 (add-watch time-zero :watcher
            (fn [key atom old-state new-state]
-             (log (into [] "time-zero set to: " new-state))))
+             (i/log abst-time (str "time-zero set to: " new-state))))
 
 (defn host-time-zero [] (map->host-time @time-zero))
 
@@ -130,7 +129,7 @@
 
 (defn derived->passing-time [derived-time]
   (let [{:keys [year month day-of-month hour minute second]} derived-time]
-    (crash abst-time "Does not need to exist - only the opposite - always have passing times, convert using opposite when need to display")))
+    (i/crash abst-time "Does not need to exist - only the opposite - always have passing times, convert using opposite when need to display")))
 
 ;;
 ;; It might be better (going from Rich Hickey saying not to ship time around - an aside in one of his talks) not
@@ -202,9 +201,9 @@
                    derived-passing-time (passing->derived-time passing-time)
                    do-echo (= (mod passing-time 100) 0)]
                (when do-echo
-                 (let [host-now (host-time abst-time)
+                 (let [host-now (i/host-time abst-time)
                        host-derived (host->derived-time host-now)]
-                   (log (into [] (str "passing-time: " derived-passing-time ", host-time: " host-derived))))))))
+                   (i/log abst-time (str "passing-time: " derived-passing-time ", host-time: " host-derived)))))))
 
 ;;
 ;; passing-time can also be in milliseconds, in which case it will of course be the number of milliseconds that
@@ -214,10 +213,10 @@
   (let [passing-time (:seconds-count @seconds-past-zero)
         derived-passing-time (passing->derived-time passing-time)
         derived-passing-as-host (map->host-time derived-passing-time)
-        host-now (host-time abst-time)
+        host-now (i/host-time abst-time)
         host-ahead-by (- (.getTime host-now) (.getTime derived-passing-as-host))
         _ (assert (<= 0 host-ahead-by 5999))
-        _ (when (>= host-ahead-by 5000) (log (into [] (str "Unusual to see host ahead by 5000 or more. Derived: " derived-passing-time ", Host: " host-now))))
+        _ (when (>= host-ahead-by 5000) (i/log abst-time (str "Unusual to see host ahead by 5000 or more. Derived: " derived-passing-time ", Host: " host-now)))
         res (+ (* 1000 passing-time) host-ahead-by)
         ]
     res))
@@ -238,7 +237,7 @@
         in-five-seconds (partial in-n-seconds 5)]
     (go-loop [wait-time 0]
              (<! (timeout wait-time))
-             (let [host-now (host-time abst-time)
+             (let [host-now (i/host-time abst-time)
                    now-derived (host->derived-time host-now)]
                (if (nil? @last-time-map)
                  (do
@@ -251,21 +250,21 @@
                        (record-time expected-in-five-seconds-map)
                        (recur 5000))
                      (let [diff (host-ahead-of-map-by expected-in-five-seconds-map host-now)]
-                       (log (into [] (str "EXPECTED: " expected-in-five-seconds-map " ACTUAL: " now-derived "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero))))
+                       (i/log abst-time (str "EXPECTED: " expected-in-five-seconds-map " ACTUAL: " now-derived "\nDIFF: " diff " when been going for " (:seconds-count @seconds-past-zero)))
                        (if (and (< (abs diff) 2000) (pos? diff))  ;; Other things using the machine seem to cause this
                                                                     ;; If the process is starved so much there's > 2 seconds delay here - then we want to crash!
                          (let [for-next-time expected-in-five-seconds-map
                                advance (if (pos? diff) 1000 -1000)]
                            (record-time for-next-time)
                            (recur (- 5000 advance)))
-                         (crash abst-time (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
+                         (i/crash abst-time (str "Need to record a variance or anomolie because diff is -ive or > 1 second: " diff)))))))))))
 
 ;;
 ;; No real reason to start more or less exactly on a second, but will make reasoning easier.
 ;;
 (defn start-timer [count]
-  (let [new-host-time (host-time abst-time)
-        millis (millis-component-host-time abst-time new-host-time)
+  (let [new-host-time (i/host-time abst-time)
+        millis (i/millis-component-of-host-time abst-time new-host-time)
         on-the-exact (or (= millis 999) (= millis 0))]
     (if on-the-exact
       (do

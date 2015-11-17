@@ -8,8 +8,8 @@
   (parse-int [this str])
   (stringify-time [this host-time])
   (crash [this] [this ^String msg])
-  (log [this txts])
-  (no-log [this txts])
+  (log [this txt])
+  (no-log [this txt])
   )
 
 (def months ["Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"])

@@ -42,9 +42,9 @@
     (throw (Throwable. msg)))
   (crash [this]
     (.crash this "Purposeful crash"))
-  (log [_ txts]
-    (println (apply str txts)))
-  (no-log [_ txts]
+  (log [_ txt]
+    (println txt))
+  (no-log [_ txt]
     ())
   )
 
