@@ -291,6 +291,10 @@
 
 (defonce _ (start-timer 0))
 
+;;
+;; Having a main is just for testing. Whether on Client or Server all you need to do is include this file and
+;; it will start working.
+;;
 #?(:clj
    (defn -main
   [& args]
