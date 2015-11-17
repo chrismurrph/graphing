@@ -1,7 +1,18 @@
 (ns graphing.passing-time
-  (:require [graphing.interop :as i])
-  (:require [graphing.clj-interop :as ci])
-  (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload))
+
+  (:require
+    #?@(:clj  [[graphing.interop :as i]
+               [graphing.clj-interop :as ci]]
+        :cljs [[graphing.interop :as i]
+               [graphing.cljs-interop :as ci]
+               [clojure.string :as str]
+               [cljs.core.async :as async :refer [<! >! chan close! put! timeout]]]))
+
+  #?(:clj (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload))
+
+  #?(:cljs (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
+
+  )
 
 (defn format-time
   [time-map]
@@ -14,7 +25,7 @@
     (* -1 val)
     val))
 
-(def abst-time (ci/->CljTime))
+(def abst-time (ci/->CljsTime))
 
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 
@@ -278,7 +289,9 @@
 
 (defonce _ (start-timer 0))
 
-;; year month-num day-of-month hour minute second
+;;
+;; Will get a warning when run from Clojurescript but that's okay.
+;;
 (defn -main
   [& args]
   ;(println (host-time 2015 0 14 11 22 06))
