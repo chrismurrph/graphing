@@ -16,12 +16,6 @@
 
 (def abst-time (ci/->CljTime))
 
-(defn host-add-seconds [system-time seconds]
-  (let [given-millis (.getTime system-time)
-        augmented-millis (+ (* seconds 1000) given-millis)
-        res (i/host-time abst-time augmented-millis)]
-    res))
-
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 
 (defn map->host-time [map-time]
@@ -83,9 +77,9 @@
   [host-time]
   ;(log "IN:" host-time)
   (let [millis (i/millis-component-of-host-time abst-time host-time)
-        {:keys [month day-of-month year hour min sec]} (i/stringify-time abst-time host-time)
-        seconds (i/parse-int abst-time sec)
-        b4-rounding {:year (i/parse-int abst-time year) :month month :day-of-month (i/parse-int abst-time day-of-month) :hour (i/parse-int abst-time hour) :minute (i/parse-int abst-time min) :second seconds}
+        {:keys [month day-of-month year hour min sec]} (i/format-from-time abst-time host-time)
+        seconds (i/parse-to-int abst-time sec)
+        b4-rounding {:year (i/parse-to-int abst-time year) :month month :day-of-month (i/parse-to-int abst-time day-of-month) :hour (i/parse-to-int abst-time hour) :minute (i/parse-to-int abst-time min) :second seconds}
         more-than-half-way-to-next (>= millis 500)]
     ;(log month " " day-of-month " " year " " hour " " min " " sec)
     (if more-than-half-way-to-next
@@ -100,7 +94,18 @@
            (fn [key atom old-state new-state]
              (i/log abst-time (str "time-zero set to: " new-state))))
 
-(defn host-time-zero [] (map->host-time @time-zero))
+(defn host-add-seconds []
+  ;;
+  ;; Thinking about stopping before-variances being calculated again and again...
+  ;; (only when the atom has been set can we create this function)
+  ;;
+  (let [before-variances (map->host-time @time-zero)]
+    (fn [seconds]
+      (let [given-millis (.getTime before-variances)
+            _ (i/log abst-time (str "getTime returns: " given-millis))
+            augmented-millis (+ (* seconds 1000) given-millis)
+            res (i/host-time abst-time augmented-millis)]
+        res))))
 
 ;;
 ;; Record variances in order as they happen. This, time-zero and anomolies will all be durable i.e. be kept
@@ -120,10 +125,9 @@
 ;; come up with the same as what the machine holds.
 ;;
 (defn passing->derived-time [passing-time]
-  (let [before-variances (host-time-zero)
-        variance-additions (sum-variances-up-to passing-time)
+  (let [variance-additions (sum-variances-up-to passing-time)
         all-additions (+ passing-time variance-additions)
-        js-res (host-add-seconds before-variances all-additions)
+        js-res ((host-add-seconds) all-additions)
         res (host->derived-time js-res)]
     res))
 
