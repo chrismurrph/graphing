@@ -6,9 +6,9 @@
         :cljs [[graphing.interop :as i]
                [graphing.cljs-interop :as ci]
                [clojure.string :as str]
-               [cljs.core.async :as async :refer [<! >! chan close! put! timeout]]]))
+               [cljs.core.async :as async :refer [<! >! chan close! timeout]]]))
 
-  #?(:clj (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload))
+  #?(:clj (:use [clojure.core.async :only [<! >! chan close! timeout go go-loop]] :reload))
 
   #?(:cljs (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
@@ -25,7 +25,12 @@
     (* -1 val)
     val))
 
-(def abst-time (ci/->CljsTime))
+;;
+;; Time functions for Clojure or Clojurescript are polymorphically dispatched. In each case ci is a
+;; different namespace.
+;;
+#?(:cljs (def abst-time (ci/->CljsTime)))
+#?(:clj (def abst-time (ci/->CljTime)))
 
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 
@@ -76,7 +81,7 @@
         (merge in-time-map {:minute (inc minute) :second (more-at-the-top second)})
         (if (< hour 23)
           (merge in-time-map {:hour (inc hour) :minute 0 :second (more-at-the-top second)})
-          (let [max-day (month last-day-of-months)]
+          (let [max-day (get last-day-of-months month)]
             (if (< day-of-month max-day)
               (merge in-time-map {:day-of-month (inc day-of-month) :hour 0 :minute 0 :second (more-at-the-top second)})
               (let [next-month (get-next-month month)]
@@ -100,23 +105,20 @@
 
 ;; If we just generate browser session data then time-zero being when the browser app starts is fine
 (def time-zero (atom nil))
+(def start-millis
+  (delay (let [start-time (map->host-time @time-zero)
+               res (.getTime start-time)
+               _ (i/log abst-time (str "start time in millis is: " res))]
+           res)))
 
 (add-watch time-zero :watcher
            (fn [key atom old-state new-state]
              (i/log abst-time (str "time-zero set to: " new-state))))
 
-(defn host-add-seconds []
-  ;;
-  ;; Thinking about stopping before-variances being calculated again and again...
-  ;; (only when the atom has been set can we create this function)
-  ;;
-  (let [before-variances (map->host-time @time-zero)]
-    (fn [seconds]
-      (let [given-millis (.getTime before-variances)
-            _ (i/log abst-time (str "getTime returns: " given-millis))
-            augmented-millis (+ (* seconds 1000) given-millis)
-            res (i/host-time abst-time augmented-millis)]
-        res))))
+(defn host-add-seconds [seconds]
+  (let [augmented-millis (+ (* seconds 1000) @start-millis)
+        res (i/host-time abst-time augmented-millis)]
+    res))
 
 ;;
 ;; Record variances in order as they happen. This, time-zero and anomolies will all be durable i.e. be kept
@@ -138,7 +140,7 @@
 (defn passing->derived-time [passing-time]
   (let [variance-additions (sum-variances-up-to passing-time)
         all-additions (+ passing-time variance-additions)
-        js-res ((host-add-seconds) all-additions)
+        js-res (host-add-seconds all-additions)
         res (host->derived-time js-res)]
     res))
 
@@ -289,13 +291,10 @@
 
 (defonce _ (start-timer 0))
 
-;;
-;; Will get a warning when run from Clojurescript but that's okay.
-;;
-(defn -main
+#?(:clj
+   (defn -main
   [& args]
   ;(println (host-time 2015 0 14 11 22 06))
   ;(start-timer 0)
   ;(println (stringify-time (host-time)))
-  (Thread/sleep 100000)
-  )
+  (Thread/sleep 100000)))
