@@ -1,5 +1,4 @@
 (ns graphing.clj-interop
-  (:gen-class)
   (:require
     [clojure.string :as str]
     [graphing.interop :as i]
@@ -39,7 +38,7 @@
   (crash [_ msg]
     (throw (Throwable. msg)))
   (crash [this]
-    (.crash this "Purposeful crash"))
+    (i/crash this "Purposeful crash"))
   (log [_ txt]
     (println txt))
   (no-log [_ txt]
