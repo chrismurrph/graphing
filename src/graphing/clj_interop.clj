@@ -17,7 +17,7 @@
     (Date.))
   (host-time [_ millis]
     (Date. millis))
-  (host-time [_ year month-num day-of-month hour minute second millis]
+  (host-time [_ year month-num day-of-month hour minute second]
     ([year month-num day-of-month hour minute second] (Date. year month-num day-of-month hour minute second)))
   (millis-component-of-host-time [_ host-time]
     (let [millis-per-second 1000

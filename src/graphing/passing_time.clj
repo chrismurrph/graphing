@@ -1,8 +1,8 @@
 (ns graphing.passing-time
   (:require [graphing.utils :refer [log]])
   (:require [graphing.interop :as i])
-  (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload)
-  (:import (graphing.clj_interop CljTime)))
+  (:require [graphing.clj-interop :as ci])
+  (:use [clojure.core.async :only [chan go <! >! go-loop close! thread timeout]] :reload))
 
 (defn format-time
   [time-map]
@@ -15,21 +15,21 @@
     (* -1 val)
     val))
 
-(def abst-time (CljTime.))
+(def abst-time (ci/->CljTime))
 
 (defn host-add-seconds [system-time seconds]
   (let [given-millis (.getTime system-time)
         augmented-millis (+ (* seconds 1000) given-millis)
-        res (host-time abst-time augmented-millis)]
+        res (i/host-time abst-time augmented-millis)]
     res))
 
 (def last-day-of-months {"Jan" 31 "Feb" 28 "Mar" 31 "Apr" 30 "May" 31 "Jun" 30 "Jul" 31 "Aug" 31 "Sep" 30 "Oct" 31 "Nov" 30 "Dec" 31})
 
 (defn map->host-time [map-time]
   (let [{:keys [year month day-of-month hour minute second]} map-time
-        host-time (host-time abst-time year (month-as-number abst-time month) day-of-month hour minute second)
+        res (i/host-time abst-time year (i/month-as-number abst-time month) day-of-month hour minute second)
         ]
-    host-time))
+    res))
 
 ;;
 ;; This function returns the difference in milliseconds. Tiny drifts can be adjusted for. Anything else is
