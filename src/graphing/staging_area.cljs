@@ -18,10 +18,10 @@
 (def line-keys [:name :units :colour :dec-places])
 
 (defn receiver [name out-chan in-chan]
-  (go-loop []
+  (go-loop [accumulated []]
     (let [data-in (<! in-chan)]
-      (log name " JUST GOT " data-in)
-      (recur)))
+      (log name " have " (inc (count accumulated)))
+      (recur (conj accumulated data-in))))
   in-chan)
 
 ;;

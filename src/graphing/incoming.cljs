@@ -1,6 +1,6 @@
 (ns graphing.incoming
   (:require [cljs.core.async :as async
-             :refer [<! >! chan close! put! timeout]]
+             :refer [<! >! chan close! put! timeout alts!]]
             [graphing.utils :refer [log]]
             [graphing.known-data-model :as db]
             [graphing.graphing :as g]
@@ -42,9 +42,9 @@
   (go-loop []
     (<! (timeout 300))
     ;(log "In controller")
-    (let [chan-idx (rand-int (count chans))
-          chan (nth chans chan-idx)
-          next-val (<! chan)
+    (let [;chan-idx (rand-int (count chans))
+          ;chan (nth chans chan-idx)
+          [next-val c] (alts! chans)
           _ (>! out-chan next-val)]
       ;(log "Waiting from " chan-idx)
       ;(log (<! chan))
