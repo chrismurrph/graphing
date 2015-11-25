@@ -4,11 +4,9 @@
             [graphing.utils :refer [log]]
             [graphing.known-data-model :as db]
             [graphing.graphing :as g]
-            [passing.passing-time :as et]
-            [graphing.utils :as u])
+            [graphing.utils :as u]
+            )
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
-
-(et/start-timer)
 
 ;;
 ;; Whenever its out channel is not blocked it will be generating a new gas value

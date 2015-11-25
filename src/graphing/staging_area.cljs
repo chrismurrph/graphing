@@ -29,7 +29,7 @@
   (doseq [line lines]
     (g/add-line (select-keys line line-keys)))
   (go-loop []
-    (log (str "===> " (<! in-chan)))
+    (no-log (str "===> " (<! in-chan)))
     (recur))
   )
 

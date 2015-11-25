@@ -3,17 +3,22 @@
             [graphing.graphing :as g]
             [graphing.utils :refer [log]]
             [graphing.staging-area :as sa]
-            [graphing.incoming :as in])
+            [graphing.incoming :as in]
+            [cljs-time.core :as t]
+            [cljs-time.format :as f]
+            )
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 (def graph-width 640)
 (def graph-height 250)
 
 ;;
-;; All dates should come from the server originally and there should be 'no timezone' kept on the client. Achieve this
+;; All dates should come from the server originally. Achieve this
 ;; by constructing time from Strings that come from the server. Even 'now' can be constructed by knowing the
 ;; difference (found out when browser is refreshed) between the time on the server and the time on this client.
-;; There could be confusion when a timezone change happens while user is logged on. A browser refresh will fix that.
+;; There will be no Daylight savings issues because the Server will be in UTC. Universal Coordinated Time.
+;;
+;; A browser refresh will fix that.
 ;; This is the known problem we will have to live with. TZ changes are handled quite well on the server. See doco
 ;; there... If the client is in the same TZ then a browser refresh won't be needed (unless the local time is
 ;; grabbed at one of the moments that the clocks are out of sync).
@@ -35,10 +40,19 @@
       (doseq [position (:positions line)]
         (g/add-point-by-sa {:name line-name :point [(:x position) (:y position) (:val position)]})))))
 
+(def built-in-formatter (f/formatter "dd/MM/yyyy HH:mm:ss"))
+
 (defn mount-root []
   (g/init {:height graph-height :width graph-width})
   (let [line-names (map :name @db/lines)
-        chan (in/query-remote-server line-names "" "")
+        now (t/now)
+        now-millis (.getTime now)
+        week-ago-millis (.getTime (t/minus now (t/weeks 1)))
+        _ (log (str "now: " now))
+        _ (log (str "curr millis: " now-millis))
+        _ (log (str "week ago millis: " week-ago-millis))
+        _ (log (str "curr formatted: " (f/unparse built-in-formatter now)))
+        chan (in/query-remote-server line-names week-ago-millis now-millis)
         _ (sa/create @db/lines chan)])
   )
 
