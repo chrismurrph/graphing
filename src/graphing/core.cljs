@@ -37,8 +37,7 @@
 
 (defn mount-root []
   (g/init {:height graph-height :width graph-width})
-  (let [;_ (in/start-timer)
-        line-names (map :name @db/lines)
+  (let [line-names (map :name @db/lines)
         chan (in/query-remote-server line-names "" "")
         _ (sa/create @db/lines chan)])
   )

@@ -4,9 +4,11 @@
             [graphing.utils :refer [log]]
             [graphing.known-data-model :as db]
             [graphing.graphing :as g]
-            [graphing.passing-time :as et]
+            [passing.passing-time :as et]
             [graphing.utils :as u])
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
+
+(et/start-timer)
 
 ;;
 ;; Whenever its out channel is not blocked it will be generating a new gas value
@@ -14,7 +16,7 @@
 (defn generator [start end name out-chan]
   (go-loop []
     ;(log "In generator")
-    (>! out-chan (str "Hi from " name))
+    (>! out-chan {name (db/random-gas-value name)})
     (recur)))
 
 ;;

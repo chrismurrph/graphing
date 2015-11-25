@@ -363,7 +363,7 @@
         args (into {:handler-fn handler-fn} (dissoc options-map :comms))]
     [main-component args]))
 
-(defn- stageing-translators [min-x min-y max-x max-y graph-width graph-height]
+(defn- staging-translators [min-x min-y max-x max-y graph-width graph-height]
   (let [horiz-trans-fn (fn [val] (u/scale {:min min-x :max max-x} {:min 0 :max graph-width} val))
         vert-trans-fn (fn [val] (u/scale {:min min-y :max max-y} {:min 0 :max graph-height} val))
         trans-point-fn (fn [[x [y val]]] [(horiz-trans-fn x) (vert-trans-fn y) val])
@@ -380,12 +380,12 @@
   (let [ch (chan)
         proc (controller ch)
         args (into {:comms ch} options-map)
-        stageing (:stageing options-map)
+        staging (:staging options-map)
         graph-width (:width options-map)
         _ (assert graph-width ":width needs to be supplied at init")
         graph-height (:height options-map)
         _ (assert graph-height ":height needs to be supplied at init")
-        translators (stageing-translators (or (:min-x stageing) 0) (or (:min-y stageing) 0) (or (:max-x stageing) 999) (or (:max-y stageing) 999) graph-width graph-height)
+        translators (staging-translators (or (:min-x staging) 0) (or (:min-y staging) 0) (or (:max-x staging) 999) (or (:max-y staging) 999) graph-width graph-height)
         ]
     (reset! state default-state)
     ;(log "TRANS: " translators)
