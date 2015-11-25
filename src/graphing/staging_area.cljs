@@ -17,21 +17,33 @@
 ;(def translator {:vertically vertically-translate :horizontally horizontally-translate :whole-point translate-point})
 (def line-keys [:name :units :colour :dec-places])
 
-(defn receiver [name in-chan]
+(defn receiver [name out-chan in-chan]
   (go-loop []
     (let [data-in (<! in-chan)]
-      (no-log name " JUST GOT " data-in)
-      (recur))))
+      (log name " JUST GOT " data-in)
+      (recur)))
+  in-chan)
 
+;;
+;;
+;;
 (defn create [lines in-chan]
   ""
   (g/remove-all-lines)
   (doseq [line lines]
     (g/add-line (select-keys line line-keys)))
-  (go-loop []
-    (no-log (str "===> " (<! in-chan)))
-    (recur))
-  )
+  (let [out-chan (chan)
+        names (map :name lines)
+        receiving-chans (into {} (map (fn [name] (vector name (chan))) names))
+        receivers (into {} (map (fn [[name chan]] (vector name (receiver name out-chan chan))) receiving-chans))]
+    (go-loop []
+      (let [latest-val (<! in-chan)
+            its-name (:name latest-val)
+            _ (no-log "name from incoming: " its-name)
+            receiving-chan (get receivers its-name)
+            _ (>! receiving-chan latest-val)])
+      (recur))
+    out-chan))
 
 (defn query
   ""

@@ -10,12 +10,15 @@
 
 ;;
 ;; Whenever its out channel is not blocked it will be generating a new gas value
+;; There is a generator for each line
 ;;
 (defn generator [start end name out-chan]
-  (go-loop []
-    ;(log "In generator")
-    (>! out-chan {name (db/random-gas-value name)})
-    (recur)))
+  (assert (> end start) "end must be greater than start")
+  (let [diff (- end start)]
+    (go-loop []
+             ;(log "In generator")
+             (>! out-chan {:name name :value (db/random-gas-value name) :time (+ (rand-int diff) start)})
+             (recur))))
 
 ;;
 ;; Just needs the channels it is going to get values from
