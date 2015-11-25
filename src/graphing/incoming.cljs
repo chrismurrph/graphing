@@ -9,16 +9,30 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
 
 ;;
+;; First will be exactly at start
+;;
+(defn create-150-times [start end]
+  (let [diff (- end start)
+        increment (quot diff 150)
+        res (map (fn [idx] (+ start (* increment idx))) (range 150))
+        _ (assert (empty? (filter #(= % 0) res)) "Expected a wide enough range could go across without needing fractions")]
+    res))
+
+;(log (create-150-times 500 2000))
+
+;;
 ;; Whenever its out channel is not blocked it will be generating a new gas value
 ;; There is a generator for each line
 ;;
 (defn generator [start end name out-chan]
   (assert (> end start) "end must be greater than start")
-  (let [diff (- end start)]
-    (go-loop []
-             ;(log "In generator")
-             (>! out-chan {:name name :value (db/random-gas-value name) :time (+ (rand-int diff) start)})
-             (recur))))
+  (let [all-times (create-150-times start end)]
+    (go-loop [completed []]
+             (when (not= (count completed) (count all-times))
+               (let [available (remove (into #{} completed) all-times)
+                     picked-time (nth available (rand-int (count available)))]
+                 (>! out-chan {:name name :value (db/random-gas-value name) :time picked-time})
+                 (recur (conj completed picked-time)))))))
 
 ;;
 ;; Just needs the channels it is going to get values from
