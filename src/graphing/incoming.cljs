@@ -11,10 +11,10 @@
 ;;
 ;; First will be exactly at start
 ;;
-(defn create-150-times [start end]
+(defn create-n-times [n start end]
   (let [diff (- end start)
-        increment (quot diff 150)
-        res (map (fn [idx] (+ start (* increment idx))) (range 150))
+        increment (quot diff n)
+        res (map (fn [idx] (+ start (* increment idx))) (range n))
         _ (assert (empty? (filter #(= % 0) res)) "Expected a wide enough range could go across without needing fractions")]
     res))
 
@@ -26,7 +26,7 @@
 ;;
 (defn generator [start end name out-chan]
   (assert (> end start) "end must be greater than start")
-  (let [all-times (create-150-times start end)]
+  (let [all-times (create-n-times 50 start end)]
     (go-loop [completed []]
              (when (not= (count completed) (count all-times))
                (let [available (remove (into #{} completed) all-times)
@@ -41,13 +41,8 @@
   (log (seq chans))
   (go-loop []
     (<! (timeout 300))
-    ;(log "In controller")
-    (let [;chan-idx (rand-int (count chans))
-          ;chan (nth chans chan-idx)
-          [next-val c] (alts! chans)
+    (let [[next-val c] (alts! chans)
           _ (>! out-chan next-val)]
-      ;(log "Waiting from " chan-idx)
-      ;(log (<! chan))
       (recur))
   ))
 
@@ -68,24 +63,24 @@
 ;;
 ;; Directly puts dots on the screen. Really it is staging-area's job to do this intelligently. So this will go.
 ;;
-(def tick-timer
-  (let [already-gone (fn [already-sent name x] (some #{{:line-name name :x x}} already-sent))]
-    (go-loop [already-sent []]
-             (<! (timeout 1000))
-             ;(log "In timer")
-             (let [line-num (rand-int 3)
-                   line (nth @db/lines line-num)
-                   name (:name line)
-                   line-size (count (:positions line))
-                   chosen-idx (rand-int line-size)
-                   position (nth (:positions line) chosen-idx)
-                   chosen-x-pos (:x position)
-                   has-gone (already-gone already-sent name chosen-x-pos)
-                   ]
-               (if has-gone
-                 (recur already-sent)
-                 (do
-                   ;(log name " at " position " about to go... ")
-                   (g/add-point-by-sa {:name name :point [chosen-x-pos (:y position) (:val position)]})
-                   (recur (conj already-sent {:line-name name :x chosen-x-pos}))))
-               ))))
+;(def tick-timer
+;  (let [already-gone (fn [already-sent name x] (some #{{:line-name name :x x}} already-sent))]
+;    (go-loop [already-sent []]
+;             (<! (timeout 1000))
+;             ;(log "In timer")
+;             (let [line-num (rand-int 2)
+;                   line (nth @db/lines line-num)
+;                   name (:name line)
+;                   line-size (count (:positions line))
+;                   chosen-idx (rand-int line-size)
+;                   position (nth (:positions line) chosen-idx)
+;                   chosen-x-pos (:x position)
+;                   has-gone (already-gone already-sent name chosen-x-pos)
+;                   ]
+;               (if has-gone
+;                 (recur already-sent)
+;                 (do
+;                   ;(log name " at " position " about to go... ")
+;                   (g/add-point-by-sa {:name name :point [chosen-x-pos (:y position) (:val position)]})
+;                   (recur (conj already-sent {:line-name name :x chosen-x-pos}))))
+;               ))))

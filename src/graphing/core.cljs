@@ -53,7 +53,9 @@
         _ (log (str "week ago millis: " week-ago-millis))
         _ (log (str "curr formatted: " (f/unparse built-in-formatter now)))
         chan (in/query-remote-server line-names week-ago-millis now-millis)
-        _ (sa/create @db/lines chan)])
+        _ (sa/create @db/lines)
+        _ (sa/show @db/lines week-ago-millis now-millis chan)
+        ])
   )
 
 (defn ^:export run []
