@@ -31,7 +31,7 @@
              (when (not= (count completed) (count all-times))
                (let [available (remove (into #{} completed) all-times)
                      picked-time (nth available (rand-int (count available)))]
-                 (>! out-chan {:name name :value (db/random-gas-value name) :time picked-time})
+                 (>! out-chan {:name name :val (db/random-gas-value name) :time picked-time})
                  (recur (conj completed picked-time)))))))
 
 ;;

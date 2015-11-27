@@ -6,8 +6,8 @@
             [graphing.incoming :as in]
             [cljs-time.core :as t]
             [cljs-time.format :as f]
-            )
-  (:require-macros [cljs.core.async.macros :refer [go]]))
+            [cljs.core.async :as async]
+            ))
 
 (def graph-width 640)
 (def graph-height 250)
@@ -54,7 +54,7 @@
         _ (log (str "curr formatted: " (f/unparse built-in-formatter now)))
         chan (in/query-remote-server line-names week-ago-millis now-millis)
         _ (sa/create @db/lines)
-        _ (sa/show @db/lines week-ago-millis now-millis chan)
+        receiving-chan (sa/show @db/lines week-ago-millis now-millis chan)
         ])
   )
 
