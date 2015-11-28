@@ -43,7 +43,6 @@
   (let [divide-num (transition-divide-by lowest highest)]
   (fn [central-y external-val]
     (let [external-over-central (- external-val central-y)
-          _ (log "Above centre y in external units: " external-over-central " from " external-val " take " central-y)
           stage-val-over-central (quot external-over-central divide-num)
           stage-val (+ stage-val-over-central 499)]
       stage-val))))
@@ -59,8 +58,7 @@
     (let [business-value (:val point-map-in)
           stage-value (transitioner business-value)
           stage-x (time->x (:time point-map-in))
-          res (merge point-map-in {:point [stage-x stage-value business-value]})
-          _ (log "RES: " res)]
+          res (merge point-map-in {:point [stage-x stage-value business-value]})]
       res)))
 
 ;;
@@ -72,10 +70,9 @@
   (let [from-world {:min start :max end}
         to-world {:min 0 :max 999}]
     (fn [time]
-      (let [_ (assert (> time start) (str "time: " time " not gt start: " start))
+      (let [_ (assert (>= time start) (str "time: " time " not gte start: " start))
             _ (assert (< time end) (str "time: " time " not lt end: " end))
-            res (u/scale from-world to-world time)
-            _ (log "SCALED: " res)]
+            res (u/scale from-world to-world time)]
         res))))
 
 ;;
