@@ -6,8 +6,9 @@
             [graphing.incoming :as in]
             [cljs-time.core :as t]
             [cljs-time.format :as f]
-            [cljs.core.async :as async]
-            ))
+            [cljs.core.async :as async :refer [<!]]
+            )
+  (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
 (def graph-width 640)
 (def graph-height 250)
@@ -55,7 +56,11 @@
         chan (in/query-remote-server line-names week-ago-millis now-millis)
         _ (sa/create @db/lines)
         receiving-chan (sa/show @db/lines week-ago-millis now-millis chan)
-        ])
+      ]
+    (go-loop []
+             (let [point (<! receiving-chan)]
+               (g/add-point-by-sa {:name (:name point) :point [(:x (:x point)) (:y (:y point)) (:val (:val point))]}))
+             (recur)))
   )
 
 (defn ^:export run []

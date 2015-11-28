@@ -5,7 +5,7 @@
             [graphing.known-data-model :refer [light-blue green pink]]
             [graphing.graphing :as g]
             [graphing.known-data-model :as db])
-  (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
+  (:require-macros [cljs.core.async.macros :refer [go-loop]]))
 
 ;;
 ;; The x and y coming in here are in 'our' co-ordinate system (i.e. not the graph's one). The scale function already
@@ -42,7 +42,7 @@
   (let [divide-num (transition-divide-by lowest highest)]
   (fn [central-y external-val]
     (let [external-over-central (- external-val central-y)
-          _ (log "Above centre y in external units: " external-over-central)
+          _ (log "Above centre y in external units: " external-over-central " from " external-val " take " central-y)
           stage-val-over-central (quot external-over-central divide-num)
           stage-val (+ stage-val-over-central 499)]
       stage-val))))
@@ -77,6 +77,10 @@
     (fn [x]
       (and (>= x start-middle) (<= x end-middle)))))
 
+;;
+;; Receives raw business trend data and transforms it so it will be positioned correctly on this stage
+;; (which is close to being positioned properly on the graph itself)
+;;
 (defn receiver [name central? out-chan in-chan]
   (let [{:keys [lowest highest]} (first (filter (fn [info] (= name (-> info :name))) gas-infos))
         _ (log name " " lowest " " highest)
