@@ -58,8 +58,9 @@
         receiving-chan (sa/show @db/lines week-ago-millis now-millis chan)
       ]
     (go-loop []
-             (let [point (<! receiving-chan)]
-               (g/add-point-by-sa {:name (:name point) :point [(:x (:x point)) (:y (:y point)) (:val (:val point))]}))
+             (let [point (<! receiving-chan)
+                   _ (log "POINT: " point)]
+               (g/add-point-by-sa {:name (:name point) :point (:point point)}))
              (recur)))
   )
 
