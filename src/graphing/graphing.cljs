@@ -2,7 +2,7 @@
   (:require [reagent.core :as reagent]
             [cljs.core.async :as async
              :refer [<! >! chan close! put! timeout]]
-            [graphing.known-data-model :refer [light-blue black white]]
+            [graphing.known-data-model :refer [gray black white very-light-blue]]
             [graphing.utils :refer [log distance bisect-vertical-between]]
             [goog.string :as gstring]
             [goog.string.format]
@@ -55,9 +55,9 @@
                                    :stroke-width (if currently-sticky 2 1)})])]
     res))
 
-(defn- text-component [x y-intersect colour-str units-str]
-  [:text {:opacity 0.7 :x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str}
-   (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect) units-str)]
+(defn- text-component [x y-intersect colour-str txt-with-units]
+  [:text {:opacity 1.0 :x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str}
+   (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect) txt-with-units)]
   )
 
 (defn- insert-labels [x drop-infos]
@@ -68,18 +68,31 @@
               y-intersect drop-info]]
     ^{:key y-intersect} [text-component x y-intersect colour-str units-str]))
 
-;(defn- opaque-rect-2 []
-;  [:rect {:x (+ x 10) :y (:proportional-y y-intersect) :width 100 :height 20 :opacity 0.7 :fill (rgb-map-to-str light-blue)}])
+;;
+;; Using another :g means this is on a different layer so the text that is put on top of this rect does not have its
+;; opacity affected.
+;;
+(defn- opaque-rect [x y]
+  (let [height 16
+        half-height (/ height 2)
+        width 45
+        indent 8
+        width-after-indent (- width 4)]
+    [:g [:rect {:x (+ indent x) :y (- y half-height) :width width-after-indent :height height :opacity 0.9 :fill (rgb-map-to-str very-light-blue) :rx 5 :ry 5}]]))
 
-(defn- opaque-rect-1 [x y]
-  [:rect {:x x :y y :width 100 :height 20 :opacity 0.7 :fill (rgb-map-to-str light-blue)}])
+(defn- backing-rects [x drop-infos]
+  [opaque-rect x (:proportional-y (first drop-infos))]
+  (for [drop-info drop-infos
+        :let [y (:proportional-y drop-info)]]
+    ^{:key y} [opaque-rect x y])
+  )
 
 ;;
 ;; Many lines coming out from the plum line
 ;;
 (defn- tick-lines [x visible drop-infos]
   ;(log "info: " drop-infos)
-  (when visible (into [:g [opaque-rect-1 x 20] (doall (insert-labels x drop-infos))]
+  (when visible (into [:g (backing-rects x drop-infos) (doall (insert-labels x drop-infos))]
                       (for [drop-info drop-infos
                             :let [line-doing (-> drop-info :name find-line)
                                   colour-str (-> line-doing :colour rgb-map-to-str)
