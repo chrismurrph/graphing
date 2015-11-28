@@ -325,9 +325,9 @@
         ;translate-vertically (-> @other-state :translator :vert)
         ]
     (assert (not (clojure.string/blank? name)) "Point trying to add must belong to a line, so need to supply a name")
-    (assert (integer? x) "x must be an integer")
-    (assert (integer? y) "y must be an integer")
+    (assert (integer? y) (str "y must be an integer, got: <" y "> from: " point-map))
     (assert (number? val) "val must be a number")
+    (assert (integer? x) (str "x must be an integer, got: <" x "> from: " point-map))
     (let [found-line (find-line name)]
       (assert found-line (str "Line must already exist for the point to be added to it. Could not find line with name: " name))
       (swap! state update-in [:my-lines name :points]

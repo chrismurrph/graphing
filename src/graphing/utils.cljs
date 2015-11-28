@@ -52,9 +52,10 @@
 ;; pixel location where to put circle on the graph
 ;;
 (defn scale [from-world to-world from-val]
-  (let [from-diff (- (:max from-world) (:min from-world))
+  (let [from-min (:min from-world)
+        from-diff (- (:max from-world) from-min)
         to-diff (- (:max to-world) (:min to-world))
-        from-proportion (/ from-val from-diff)
+        from-proportion (/ (- from-val from-min) from-diff)
         res (+ (:min to-world) (* to-diff from-proportion))
         rounded-res (round res)
         ;_ (log rounded-res " | " res)
