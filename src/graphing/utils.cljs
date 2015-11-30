@@ -78,6 +78,22 @@
     (* -1 val)
     val))
 
+(defn next-in-vec [curr-val whole-vec]
+  (assert curr-val)
+  (assert whole-vec (str "No whole-vec when wanting: " curr-val " from it"))
+  (assert (coll? whole-vec))
+  (let [vec-with-idx (map-indexed (fn [idx itm] [idx itm]) whole-vec)
+        curr (first (filter (fn [pair] (= (second pair) curr-val)) vec-with-idx))
+        idx-of (first curr)
+        size (count whole-vec)
+        next-idx (if (= size 1)
+                   idx-of
+                   (if (= idx-of (dec size))
+                     0
+                     (inc idx-of)))
+        res (nth whole-vec next-idx)]
+    res))
+
 (defn style [& info]
   {:style (.trim (apply str (map #(let [[kwd val] %]
                                    (str (name kwd) " " val "; "))

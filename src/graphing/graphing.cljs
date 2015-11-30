@@ -18,26 +18,19 @@
 (defn- format-as-str [dec-pl val units]
   (gstring/format (str "%." dec-pl "f" units) val))
 
-;(def uniqkey (atom 0))
-;(defn gen-key []
-;  (let [res (swap! uniqkey inc)]
-;    ;(u/log res)
-;    res))
-
 (defn- now-time [] (js/Date.))
-(defn- seconds [js-date] (.getSeconds js-date))
+(defn- seconds [js-date] (/ (.getTime js-date) 1000))
 
 ;;
-;; Currently leaving up forever. Will prolly re-instate use of this later...
+;; In this namespace a label might be "Tube 1, Oxygen" or "Plastics Eff Ratio" or "BHP Billiton P/E ratio". It is what
+;; represents the line that is being graphed. Seen by the human user and used as :line-id. Just a String.
+;; Note that labels is made up of things that look like: {:name "Methane", :proportional-y 132.46547214801495, :proportional-val 0.09617788534898025}
+;; Whereas :current-label will be eg: {:name "Carbon Monoxide", :tstamp 1448876445368}
 ;;
-(defn- still-interested? [past-time current-time]
-  (let [diff (- (seconds current-time) (seconds past-time))]
-    (< diff 30)))
-
-(def default-state {:my-lines {} :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels []})
+(def default-state {:my-lines {} :hover-pos nil :last-mouse-moment nil :labels-visible? false :in-sticky-time? false :labels [] :current-label nil})
 (def state (ratom default-state))
-(def default-other-state {:translator nil})
-(def other-state (atom default-other-state))
+(def default-init-state {:translator nil})
+(def init-state (atom default-init-state))
 
 (defn- find-line [name]
   (get (:my-lines @state) name))
@@ -55,44 +48,49 @@
                                    :stroke-width (if currently-sticky 2 1)})])]
     res))
 
-(defn- text-component [x y-intersect colour-str txt-with-units]
-  [:text {:opacity 1.0 :x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str}
+(defn- hidden? [line-id]
+  (let [current (:name (:current-label @state))]
+    (not= current line-id)))
+
+(defn- text-component [x y-intersect colour-str txt-with-units line-id]
+  [:text {:opacity (if (hidden? line-id) 0 1.0) :x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str}
    (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect) txt-with-units)]
   )
 
-(defn- insert-labels [x drop-infos]
+(defn- insert-texts [x drop-infos]
   (for [drop-info drop-infos
         :let [line-doing (-> drop-info :name find-line)
               colour-str (-> line-doing :colour rgb-map-to-str)
               units-str (:units line-doing)
+              line-id (:name line-doing)
               y-intersect drop-info]]
-    ^{:key y-intersect} [text-component x y-intersect colour-str units-str]))
+    ^{:key y-intersect} [text-component x y-intersect colour-str units-str line-id]))
 
 ;;
 ;; Using another :g means this is on a different layer so the text that is put on top of this rect does not have its
 ;; opacity affected.
 ;;
-(defn- opaque-rect [x y]
+(defn- opaque-rect [x y line-id]
   (let [height 16
         half-height (/ height 2)
-        width 45
+        width 45 ;; later we might use how many digits there are
         indent 8
         width-after-indent (- width 4)]
-    [:g [:rect {:x (+ indent x) :y (- y half-height) :width width-after-indent :height height :opacity 0.9 :fill (rgb-map-to-str very-light-blue) :rx 5 :ry 5}]]))
+    [:g [:rect {:x (+ indent x) :y (- y half-height) :width width-after-indent :height height :opacity (if (hidden? line-id) 0 0.9) :fill (rgb-map-to-str very-light-blue) :rx 5 :ry 5}]]))
 
 (defn- backing-rects [x drop-infos]
-  [opaque-rect x (:proportional-y (first drop-infos))]
   (for [drop-info drop-infos
-        :let [y (:proportional-y drop-info)]]
-    ^{:key y} [opaque-rect x y])
+        :let [y (:proportional-y drop-info)
+              line-id (:name drop-info)]]
+    ^{:key y} [opaque-rect x y line-id])
   )
 
 ;;
-;; Many lines coming out from the plum line
+;; Many lines coming out from the plum line, then with each the backing rect and then the text
 ;;
 (defn- tick-lines [x visible drop-infos]
   ;(log "info: " drop-infos)
-  (when visible (into [:g (backing-rects x drop-infos) (doall (insert-labels x drop-infos))]
+  (when visible (into [:g (backing-rects x drop-infos) (doall (insert-texts x drop-infos))]
                       (for [drop-info drop-infos
                             :let [line-doing (-> drop-info :name find-line)
                                   colour-str (-> line-doing :colour rgb-map-to-str)
@@ -180,7 +178,7 @@
 ;;
 (defn- points-from-lines [my-lines]
   ;(log "ALL: " my-lines)
-  (let [translate-point (-> @other-state :translator :point)]
+  (let [translate-point (-> @init-state :translator :point)]
     (for [line-vec my-lines
           :let [;_ (log "LINE: " line-vec)
                 line-val (second line-vec)
@@ -226,7 +224,7 @@
 ;;
 (defn- enclosed-by [x line-name]
   (let [points (line-points line-name)
-        translate-horizontally (-> @other-state :translator :horiz)
+        translate-horizontally (-> @init-state :translator :horiz)
         ;_ (u/log "positions to reduce over: " positions)
         res (reduce (fn [acc ele] (if (empty? (:res acc))
                                     (let [cur-x (translate-horizontally (key ele))]
@@ -264,7 +262,7 @@
         surrounding-at (partial enclosed-by x)
         many-enclosed-by-res (remove nil? (map surrounding-at names))
         ;_ (log "enclosed result: " many-enclosed-by-res)
-        translate-point (-> @other-state :translator :point)
+        translate-point (-> @init-state :translator :point)
         results (for [enclosed-by-res many-enclosed-by-res
                            :let [{name :name pair :pair} enclosed-by-res
                                  left-of (first pair)
@@ -288,16 +286,33 @@
                             (let [diff (- (seconds current-time) (seconds past-time))]
                               (< 1 diff 4))))]
   (fn []
-    (let [now (now-time)
+    (let [tick-moment (now-time)
           last-time-moved (:last-mouse-moment @state)
           currently-sticky (get-in @state [:in-sticky-time?])
-          now-sticking (in-sticky-time? last-time-moved now)
+          now-sticking (in-sticky-time? last-time-moved tick-moment)
           x (get-in @state [:hover-pos])
-          labels-already-showing (get-in @state [:labels-visible?])]
+          labels-already-showing? (get-in @state [:labels-visible?])]
+      (when labels-already-showing?
+        (let [old-tstamp (get-in @state [:current-label :tstamp])
+              now-is (.getTime tick-moment)
+              diff (- now-is old-tstamp)]
+          (when (> diff 2000)
+            (log "Now it is: " now-is ", whereas timestamp done at: " old-tstamp ", diff: " diff)
+            (let [current-label (get-in @state [:current-label :name])
+                  nxt-current-label (u/next-in-vec current-label (map :name (get-in @state [:labels])))
+                  ;_ (log "Nxt label is " nxt-current-label)
+                  ]
+              (swap! state assoc-in [:current-label] {:name nxt-current-label :tstamp (.now js/Date)}))
+            )
+          ))
       (if (not currently-sticky)
         (when now-sticking
-          (when (not labels-already-showing)
-            (swap! state assoc-in [:labels] (show-labels-moment x))
+          (when (not labels-already-showing?)
+            (let [labels-info (show-labels-moment x)
+                  first-name (:name (first labels-info))
+                  _ (log "First vis: " first-name)]
+              (swap! state assoc-in [:labels] labels-info)
+              (swap! state assoc-in [:current-label] {:name first-name :tstamp (.now js/Date)}))
             (swap! state assoc-in [:labels-visible?] true)
             (swap! state assoc-in [:in-sticky-time?] true)))
         (when (not now-sticking)
@@ -344,8 +359,8 @@
 (defn add-point-by-sa [point-map]
   (let [name (:name point-map)
         [x y val] (:point point-map)
-        ;translate-horizontally (-> @other-state :translator :horiz)
-        ;translate-vertically (-> @other-state :translator :vert)
+        ;translate-horizontally (-> @init-state :translator :horiz)
+        ;translate-vertically (-> @init-state :translator :vert)
         ]
     (assert (not (clojure.string/blank? name)) "Point trying to add must belong to a line, so need to supply a name")
     (assert (integer? y) (str "y must be an integer, got: <" y "> from: " point-map))
@@ -412,7 +427,7 @@
         ]
     (reset! state default-state)
     ;(log "TRANS: " translators)
-    (swap! other-state assoc-in [:translator] translators)
+    (swap! init-state assoc-in [:translator] translators)
     (reagent/render-component
       [trending-app args]
       (.-body js/document))
