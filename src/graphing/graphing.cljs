@@ -53,7 +53,7 @@
     (not= current line-id)))
 
 (defn- text-component [x y-intersect colour-str txt-with-units line-id]
-  [:text {:opacity (if (hidden? line-id) 0 1.0) :x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str}
+  [:text {:opacity (if (hidden? line-id) 0.0 1.0) :x (+ x 10) :y (+ (:proportional-y y-intersect) 4) :font-size "0.8em" :stroke colour-str}
    (format-as-str (or (:dec-places y-intersect) 2) (:proportional-val y-intersect) txt-with-units)]
   )
 
@@ -76,7 +76,7 @@
         width 45 ;; later we might use how many digits there are
         indent 8
         width-after-indent (- width 4)]
-    [:g [:rect {:x (+ indent x) :y (- y half-height) :width width-after-indent :height height :opacity (if (hidden? line-id) 0 0.9) :fill (rgb-map-to-str very-light-blue) :rx 5 :ry 5}]]))
+    [:g [:rect {:x (+ indent x) :y (- y half-height) :width width-after-indent :height height :opacity (if (hidden? line-id) 0.0 1.0) :fill (rgb-map-to-str white) :rx 5 :ry 5}]]))
 
 (defn- backing-rects [x drop-infos]
   (for [drop-info drop-infos
@@ -100,7 +100,8 @@
                                        (merge line-defaults
                                               {:x1 x :y1 drop-distance
                                                :x2 (+ x 6) :y2 drop-distance
-                                               :stroke colour-str})]]]
+                                               :stroke colour-str
+                                               :opacity (if (hidden? (:name line-doing)) 0.0 1.0)})]]]
                         res))))
 
 ;;
@@ -297,7 +298,7 @@
               now-is (.getTime tick-moment)
               diff (- now-is old-tstamp)]
           (when (> diff 2000)
-            (log "Now it is: " now-is ", whereas timestamp done at: " old-tstamp ", diff: " diff)
+            ;(log "Now it is: " now-is ", whereas timestamp done at: " old-tstamp ", diff: " diff)
             (let [current-label (get-in @state [:current-label :name])
                   nxt-current-label (u/next-in-vec current-label (map :name (get-in @state [:labels])))
                   ;_ (log "Nxt label is " nxt-current-label)
@@ -356,7 +357,7 @@
 ;; again. This will happen when the axes encroach in from the left.
 ;; Because this is part of the public API (for staging area anyway) the translator is kept in an atom.
 ;;
-(defn add-point-by-sa [point-map]
+(defn add-point [point-map]
   (let [name (:name point-map)
         [x y val] (:point point-map)
         ;translate-horizontally (-> @init-state :translator :horiz)

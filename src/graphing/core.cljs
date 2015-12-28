@@ -39,7 +39,7 @@
   (doseq [line @db/lines]
     (let [line-name (:name line)]
       (doseq [position (:positions line)]
-        (g/add-point-by-sa {:name line-name :point [(:x position) (:y position) (:val position)]})))))
+        (g/add-point {:name line-name :point [(:x position) (:y position) (:val position)]})))))
 
 (def built-in-formatter (f/formatter "dd/MM/yyyy HH:mm:ss"))
 
@@ -58,8 +58,8 @@
         receiving-chan (sa/show @db/lines week-ago-millis now-millis chan)
       ]
     (go-loop []
-             (let [point (<! receiving-chan)]
-               (g/add-point-by-sa {:name (:name point) :point (:point point)}))
+             (let [{:keys [name point]} (<! receiving-chan)]
+               (g/add-point {:name name :point point}))
              (recur)))
   )
 
